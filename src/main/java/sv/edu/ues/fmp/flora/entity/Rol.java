@@ -1,19 +1,22 @@
 package sv.edu.ues.fmp.flora.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Rol del sistema. Corresponde a la tabla {@code rol}.
  * La columna {@code nombre} tiene restriccion UNIQUE en la base de datos.
+ * La relacion con {@code permiso} se modela en la entidad propia
+ * {@link RolPermiso}, que mapea la tabla de union {@code rol_permiso}.
  */
 @Entity
 @Table(name = "rol")
@@ -38,10 +41,4 @@ public class Rol {
     @Builder.Default
     @Column(name = "activo", nullable = false)
     private Boolean activo = true;
-
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    @Builder.Default
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(name = "rol_permiso", joinColumns = @JoinColumn(name = "rol_id"), inverseJoinColumns = @JoinColumn(name = "permiso_id"))
-    private List<Permiso> permisos = new ArrayList<>();
 }

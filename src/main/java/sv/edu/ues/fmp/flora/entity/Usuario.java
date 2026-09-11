@@ -1,26 +1,54 @@
 package sv.edu.ues.fmp.flora.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
 
 import java.time.LocalDateTime;
 
-@AllArgsConstructor
-@NoArgsConstructor
+/**
+ * Usuario del sistema. Corresponde a la tabla {@code usuario}.
+ * <p>
+ * Restricciones que viven solo en la base y no se pueden expresar en JPA:
+ * <ul>
+ *   <li>{@code ck_usuario_correo}: CHECK que exige que {@code correo} tenga
+ *       forma de direccion de correo.</li>
+ *   <li>{@code uk_usuario_correo_lower} y {@code uk_usuario_nombre_lower}:
+ *       indices unicos <em>funcionales</em> sobre {@code lower(correo)} y
+ *       {@code lower(nombre_usuario)}. JPA solo sabe declarar UNIQUE sobre la
+ *       columna tal cual, asi que aqui no se declaran; la deteccion de
+ *       duplicados se hace en el servicio con consultas {@code ...IgnoreCase}.</li>
+ *   <li>{@code trg_usuario_fecha_actualizacion}: trigger BEFORE UPDATE que
+ *       reescribe {@code fecha_actualizacion} en cada modificacion.</li>
+ * </ul>
+ * Tanto {@code fecha_registro} (DEFAULT CURRENT_TIMESTAMP) como
+ * {@code fecha_actualizacion} (DEFAULT mas trigger) las asigna PostgreSQL, por
+ * eso van anotadas con {@link Generated}: Hibernate no las escribe, las relee
+ * de la base despues de cada INSERT o UPDATE.
+ */
+@Entity
+@Table(name = "usuario")
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
-@Entity
-@Table(name = "usuario", uniqueConstraints =  { @UniqueConstraint(name = "uk_correo", columnNames = {"correo"})})
 public class Usuario {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_usuario", nullable = false, updatable = false)
-    private Long id;
+    private Long idUsuario;
 
     @Column(name = "nombres", nullable = false, length = 100)
     private String nombres;
@@ -31,22 +59,21 @@ public class Usuario {
     @Column(name = "correo", nullable = false, length = 150)
     private String correo;
 
-    @Column(name = "nombre_usuario", nullable = false, unique = true, length = 50)
+    @Column(name = "nombre_usuario", nullable = false, length = 60)
     private String nombreUsuario;
 
-    @JsonIgnore
-    @Column(name = "clave", nullable = false, length = 255)
-    private String clave;
+    @Column(name = "clave_hash", nullable = false, length = 255)
+    private String claveHash;
 
     @Builder.Default
     @Column(name = "activo", nullable = false)
-    private boolean activo = true;
+    private Boolean activo = true;
 
-    @CreationTimestamp
+    @Generated(event = EventType.INSERT)
     @Column(name = "fecha_registro", nullable = false, updatable = false)
     private LocalDateTime fechaRegistro;
 
-    @UpdateTimestamp
+    @Generated(event = { EventType.INSERT, EventType.UPDATE })
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
 

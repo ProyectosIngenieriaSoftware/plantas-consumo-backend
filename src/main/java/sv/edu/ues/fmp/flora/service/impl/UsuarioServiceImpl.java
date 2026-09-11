@@ -80,14 +80,14 @@ public class UsuarioServiceImpl implements UsuarioService {
         Usuario entidad = buscarOFallar(id);
 
         usuarioRepository.findByCorreoIgnoreCase(request.correo())
-                .filter(otro -> !otro.getId().equals(id))
+                .filter(otro -> !otro.getIdUsuario().equals(id))
                 .ifPresent(otro -> {
                     throw new RecursoDuplicadoException(
                             "Ya existe otro usuario con el correo " + request.correo());
                 });
 
         usuarioRepository.findByNombreUsuarioIgnoreCase(request.nombreUsuario())
-                .filter(otro -> !otro.getId().equals(id))
+                .filter(otro -> !otro.getIdUsuario().equals(id))
                 .ifPresent(otro -> {
                     throw new RecursoDuplicadoException(
                             "Ya existe otro usuario con el nombre de usuario " + request.nombreUsuario());
@@ -112,10 +112,10 @@ public class UsuarioServiceImpl implements UsuarioService {
     public UsuarioResponse iniciarSesion(UsuarioLoginRequest request) {
         Usuario usuario = usuarioRepository
                 .findByCorreoIgnoreCaseOrNombreUsuarioIgnoreCase(request.usuario(), request.usuario())
-                .filter(Usuario::isActivo)
+                .filter(Usuario::getActivo)
                 .orElseThrow(() -> new CredencialesInvalidasException("Usuario o clave incorrectos"));
 
-        if (!passwordEncoder.matches(request.clave(), usuario.getClave())) {
+        if (!passwordEncoder.matches(request.clave(), usuario.getClaveHash())) {
             throw new CredencialesInvalidasException("Usuario o clave incorrectos");
         }
 

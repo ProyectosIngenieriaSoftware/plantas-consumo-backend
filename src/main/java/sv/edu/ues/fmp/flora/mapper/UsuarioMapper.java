@@ -21,7 +21,7 @@ public class UsuarioMapper {
                 .apellidos(request.apellido())
                 .correo(request.correo())
                 .nombreUsuario(request.nombreUsuario())
-                .clave(passwordEncoder.encode(request.clave()))
+                .claveHash(passwordEncoder.encode(request.clave()))
                 .build();
     }
 
@@ -34,12 +34,12 @@ public class UsuarioMapper {
 
     public UsuarioResponse toResponse(Usuario entity) {
         return UsuarioResponse.builder()
-                .id(entity.getId())
+                .id(entity.getIdUsuario())
                 .nombres(entity.getNombres())
                 .apellidos(entity.getApellidos())
                 .correo(entity.getCorreo())
                 .nombreUsuario(entity.getNombreUsuario())
-                .activo(entity.isActivo())
+                .activo(entity.getActivo())
                 .fechaRegistro(entity.getFechaRegistro())
                 .fechaActualizacion(entity.getFechaActualizacion())
                 .ultimoAcceso(entity.getUltimoAcceso())
