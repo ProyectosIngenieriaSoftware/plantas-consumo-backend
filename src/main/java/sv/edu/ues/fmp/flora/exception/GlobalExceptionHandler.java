@@ -10,6 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -57,6 +58,66 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(cuerpo);
+    }
+
+    /**
+     * Login fallido (usuario/correo inexistente, clave incorrecta o cuenta
+     * desactivada) -> 401 UNAUTHORIZED. El mensaje es siempre el mismo para
+     * no revelar cual de esas tres cosas paso.
+     */
+    @ExceptionHandler(CredencialesInvalidasException.class)
+    public ResponseEntity<ErrorResponse> manejarCredencialesInvalidas(
+            CredencialesInvalidasException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.UNAUTHORIZED.value())
+                .error("No autorizado")
+                .mensaje(ex.getMessage())
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(cuerpo);
+    }
+
+    /**
+     * El id recibido (path variable) no es un valor valido -> 400 BAD REQUEST.
+     */
+    @ExceptionHandler(IdInvalidoException.class)
+    public ResponseEntity<ErrorResponse> manejarIdInvalido(
+            IdInvalidoException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.BAD_REQUEST.value())
+                .error("Id inválido")
+                .mensaje(ex.getMessage())
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(cuerpo);
+    }
+
+    /**
+     * Un path variable o request param no se pudo convertir al tipo esperado
+     * (por ejemplo, "/api/usuarios/abc") -> 400 BAD REQUEST.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> manejarTipoInvalido(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.BAD_REQUEST.value())
+                .error("Parámetro inválido")
+                .mensaje("El valor de '" + ex.getName() + "' no tiene el formato esperado")
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(cuerpo);
     }
 
     /**

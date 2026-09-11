@@ -8,10 +8,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
-/**
- * Usuario del sistema. Corresponde a la tabla {@code usuario}.
- * Las columnas {@code correo} y {@code nombre_usuario} tienen restriccion UNIQUE.
- */
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter

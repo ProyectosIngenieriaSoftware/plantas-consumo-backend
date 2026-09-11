@@ -3,6 +3,8 @@ package sv.edu.ues.fmp.flora.exception;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,6 +23,7 @@ import lombok.Setter;
 @Builder
 public class ErrorResponse {
 
+    @JsonFormat(pattern = "dd/MM/yyyy HH:mm:ss")
     private LocalDateTime timestamp;
     private int estado;
     private String error;
