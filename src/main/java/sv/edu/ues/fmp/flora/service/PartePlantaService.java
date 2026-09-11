@@ -9,6 +9,8 @@ import sv.edu.ues.fmp.flora.dto.response.PartePlantaResponse;
  * Contrato de negocio para las partes de planta.
  * Trabaja solo con DTOs: la entidad no cruza hacia el controlador.
  */
+
+//contrato
 public interface PartePlantaService {
 
     List<PartePlantaResponse> listarTodas();
@@ -22,4 +24,7 @@ public interface PartePlantaService {
     PartePlantaResponse actualizar(Long id, PartePlantaRequest request);
 
     void desactivar(Long id);
+
+
+
 }

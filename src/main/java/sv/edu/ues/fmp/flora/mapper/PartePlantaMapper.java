@@ -9,7 +9,7 @@ import sv.edu.ues.fmp.flora.entity.PartePlanta;
 
 @Component
 public class PartePlantaMapper {
-
+   //convierte DTOs a entidades y viceversa
 
     public PartePlanta toEntity(PartePlantaRequest request) {
         return PartePlanta.builder()
@@ -23,6 +23,7 @@ public class PartePlantaMapper {
         entity.setDescripcion(request.getDescripcion());
     }
 
+    // entidad a dto
     public PartePlantaResponse toResponse(PartePlanta entity) {
         return PartePlantaResponse.builder()
                 .idPartePlanta(entity.getIdPartePlanta())
