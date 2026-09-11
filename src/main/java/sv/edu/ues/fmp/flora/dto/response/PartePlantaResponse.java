@@ -13,7 +13,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class PartePlantaResponse {
-
+    //lo que sale
     private Long idPartePlanta;
     private String nombre;
     private String descripcion;

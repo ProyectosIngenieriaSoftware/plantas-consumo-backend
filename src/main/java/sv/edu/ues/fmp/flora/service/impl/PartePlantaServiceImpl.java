@@ -26,10 +26,9 @@ import sv.edu.ues.fmp.flora.service.PartePlantaService;
 @RequiredArgsConstructor
 public class PartePlantaServiceImpl implements PartePlantaService {
 
-    // Inyeccion por constructor generada por @RequiredArgsConstructor sobre los
-    // campos final: las dependencias quedan explicitas e inmutables.
     private final PartePlantaRepository partePlantaRepository;
     private final PartePlantaMapper partePlantaMapper;
+
 
     @Override
     @Transactional(readOnly = true)
@@ -61,10 +60,6 @@ public class PartePlantaServiceImpl implements PartePlantaService {
     @Override
     @Transactional
     public PartePlantaResponse crear(PartePlantaRequest request) {
-        // La base ya tiene UNIQUE sobre parte_planta.nombre, pero se valida aqui
-        // igualmente: si dejaramos que reventara la base, el cliente recibiria un
-        // 500 con una excepcion de driver. Validando antes devolvemos un 409
-        // legible que explica exactamente que paso.
         if (partePlantaRepository.existsByNombreIgnoreCase(request.getNombre())) {
             throw new RecursoDuplicadoException(
                     "Ya existe una parte de planta con el nombre " + request.getNombre());
@@ -72,8 +67,6 @@ public class PartePlantaServiceImpl implements PartePlantaService {
 
         PartePlanta nueva = partePlantaMapper.toEntity(request);
 
-        // En crear si hace falta save(): la entidad es nueva y todavia no esta
-        // gestionada por el contexto de persistencia.
         PartePlanta guardada = partePlantaRepository.save(nueva);
 
         return partePlantaMapper.toResponse(guardada);
@@ -84,8 +77,6 @@ public class PartePlantaServiceImpl implements PartePlantaService {
     public PartePlantaResponse actualizar(Long id, PartePlantaRequest request) {
         PartePlanta entidad = buscarOFallar(id);
 
-        // El nombre puede repetirse consigo mismo (el usuario quiza solo cambio la
-        // descripcion), pero no puede pisar el nombre de OTRO registro.
         Optional<PartePlanta> conMismoNombre =
                 partePlantaRepository.findByNombreIgnoreCase(request.getNombre());
         if (conMismoNombre.isPresent()
@@ -96,11 +87,6 @@ public class PartePlantaServiceImpl implements PartePlantaService {
 
         partePlantaMapper.updateEntity(entidad, request);
 
-        // No se llama a repository.save() a proposito. La entidad se obtuvo dentro
-        // de esta transaccion, asi que esta gestionada (managed) por el contexto de
-        // persistencia de Hibernate. Al hacer commit, Hibernate compara el estado
-        // actual con el que leyo al cargarla (dirty checking) y emite el UPDATE por
-        // su cuenta. Llamar a save() aqui seria redundante.
         return partePlantaMapper.toResponse(entidad);
     }
 
@@ -109,20 +95,12 @@ public class PartePlantaServiceImpl implements PartePlantaService {
     public void desactivar(Long id) {
         PartePlanta entidad = buscarOFallar(id);
 
-        // Borrado LOGICO, nunca delete() fisico: otras tablas referencian
-        // parte_planta por clave foranea y un DELETE romperia esas referencias.
-        // Ademas, en un sistema de conocimiento cientifico la informacion no se
-        // destruye: se marca como no vigente y queda disponible como historico.
         entidad.setActivo(false);
 
-        // Igual que en actualizar: la entidad esta gestionada, el dirty checking
-        // se encarga del UPDATE al cerrar la transaccion.
     }
 
-    /**
-     * Recupera la entidad o corta el flujo con la excepcion de negocio.
-     * Se centraliza aqui para no repetir el mismo mensaje en cada metodo.
-     */
+
+
     private PartePlanta buscarOFallar(Long id) {
         return partePlantaRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException(

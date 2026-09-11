@@ -1,5 +1,6 @@
 package sv.edu.ues.fmp.flora.dto.request;
 
+import jakarta.persistence.Column;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -14,10 +15,11 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class PartePlantaRequest {
-
-    @NotBlank(message = "El nombre es obligatorio")
+    // lo que entra
+    @NotBlank(message = "El nombre es obligatorio") // (null,""," ")
     @Size(max = 80, message = "El nombre no puede exceder 80 caracteres")
     private String nombre;
+
 
     @Size(max = 250, message = "La descripción no puede exceder 250 caracteres")
     private String descripcion;
