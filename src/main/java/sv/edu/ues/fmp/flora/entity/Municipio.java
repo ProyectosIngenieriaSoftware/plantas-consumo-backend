@@ -10,6 +10,7 @@ import lombok.*;
  * dentro de su departamento, no globalmente.
  * Puede haber dos municipios llamados igual si están en departamentos distintos.
  * Esa validación tiene que hacerse en el servicio:
+ * uk_municipio_departamento_nombre UNIQUE (id_departamento, nombre) YA ESTÁ EN LA BASE DE DATOS
  */
 @Entity
 @Table(name = "municipio")

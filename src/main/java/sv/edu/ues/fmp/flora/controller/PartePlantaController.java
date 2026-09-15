@@ -2,6 +2,9 @@ package sv.edu.ues.fmp.flora.controller;
 
 import java.util.List;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -20,12 +23,15 @@ import sv.edu.ues.fmp.flora.dto.request.PartePlantaRequest;
 import sv.edu.ues.fmp.flora.dto.response.PartePlantaResponse;
 import sv.edu.ues.fmp.flora.service.PartePlantaService;
 
+@Tag(name = "Partes de planta", description = "Catálogo de partes comestibles")
 @RestController
 @RequestMapping("/api/partes-planta")
 @RequiredArgsConstructor
 public class PartePlantaController {
     private final PartePlantaService partePlantaService;
 
+    @Operation(summary = "Listar partes de planta")
+    @ApiResponse(responseCode = "200", description = "Listado obtenido")
     @GetMapping
     public ResponseEntity<List<PartePlantaResponse>> listar(
             @RequestParam(name = "soloActivas", defaultValue = "false") boolean soloActivas) {
