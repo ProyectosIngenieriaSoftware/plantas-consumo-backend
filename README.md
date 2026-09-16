@@ -13,6 +13,6 @@ API REST construida para la gestión del catálogo de plantas de consumo humano 
 ## ⚙️ Requisitos Previos
 
 Antes de ejecutar el proyecto, asegúrate de tener instalado:
-* Java Development Kit (JDK) 17 o superior.
+* Java Development Kit (JDK) 25 o superior.
 * Servidor de PostgreSQL corriendo en tu máquina local.
-* Tu IDE favorito (IntelliJ IDEA, Eclipse, VS Code).
+* IntelliJ IDEA
