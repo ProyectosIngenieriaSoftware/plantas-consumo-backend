@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import sv.edu.ues.fmp.flora.dto.request.PartePlantaRequest;
 import sv.edu.ues.fmp.flora.dto.response.PartePlantaResponse;
 import sv.edu.ues.fmp.flora.service.PartePlantaService;
+//import sv.edu.ues.fmp.flora.service.impl.PartePlantaServiceImpl;
 
 @RestController
 @RequestMapping("/api/partes-planta")
