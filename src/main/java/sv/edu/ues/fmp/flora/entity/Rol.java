@@ -1,0 +1,44 @@
+package sv.edu.ues.fmp.flora.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+ * Rol del sistema. Corresponde a la tabla {@code rol}.
+ * La columna {@code nombre} tiene restriccion UNIQUE en la base de datos.
+ * La relacion con {@code permiso} se modela en la entidad propia
+ * {@link RolPermiso}, que mapea la tabla de union {@code rol_permiso}.
+ */
+@Entity
+@Table(name = "rol")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Rol {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id_rol", nullable = false, updatable = false)
+    private Long idRol;
+
+    @Column(name = "nombre", nullable = false, unique = true, length = 50)
+    private String nombre;
+
+    @Column(name = "descripcion", length = 250)
+    private String descripcion;
+
+    @Builder.Default
+    @Column(name = "activo", nullable = false)
+    private Boolean activo = true;
+}
