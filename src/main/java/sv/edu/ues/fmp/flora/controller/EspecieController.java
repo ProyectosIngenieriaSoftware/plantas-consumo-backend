@@ -135,4 +135,16 @@ public class EspecieController {
         especieService.desactivar(id);
         return ResponseEntity.noContent().build();
     }
+
+    @Operation(summary = "Activar una especie desactivada",
+            description = "Revierte la baja lógica. Es idempotente: sobre una especie que ya "
+                    + "está activa no cambia nada y devuelve 200 igualmente. No modifica el "
+                    + "estado de publicación: si la especie estaba PUBLICADA, vuelve al "
+                    + "catálogo público de inmediato.")
+    @ApiResponse(responseCode = "200", description = "Especie activa")
+    @ApiResponse(responseCode = "404", description = "No existe una especie con ese id")
+    @PatchMapping("/{id}/activar")
+    public ResponseEntity<EspecieResponse> activar(@PathVariable Long id) {
+        return ResponseEntity.ok(especieService.activar(id));
+    }
 }
