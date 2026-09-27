@@ -28,6 +28,7 @@ import sv.edu.ues.fmp.flora.repository.TaxonomiaRepository;
 import sv.edu.ues.fmp.flora.repository.UsuarioRepository;
 import sv.edu.ues.fmp.flora.service.EspecieService;
 import sv.edu.ues.fmp.flora.service.NombreComunService;
+import sv.edu.ues.fmp.flora.util.Textos;
 
 /**
  * Implementacion de la logica de negocio de las especies.
@@ -84,6 +85,8 @@ public class EspecieServiceImpl implements EspecieService {
     @Override
     @Transactional
     public EspecieResponse crear(EspecieRequest request) {
+        normalizar(request);
+
         // La base tiene el indice unico funcional uk_especie_nombre_cientifico_lower
         // sobre lower(nombre_cientifico). Se valida aqui para devolver un 409
         // legible en vez de dejar que estalle la restriccion en el driver.
@@ -179,6 +182,8 @@ public class EspecieServiceImpl implements EspecieService {
     @Override
     @Transactional
     public EspecieResponse actualizar(Long id, EspecieRequest request) {
+        normalizar(request);
+
         Especie entidad = buscarOFallar(id);
 
         Optional<Especie> conMismoNombre =
@@ -314,6 +319,8 @@ public class EspecieServiceImpl implements EspecieService {
     @Override
     @Transactional
     public EspecieResponse actualizarTaxonomia(Long idEspecie, TaxonomiaRequest request) {
+        normalizar(request);
+
         Especie entidad = buscarOFallar(idEspecie);
 
         // getTaxonomia() dispara aqui la carga perezosa del @OneToOne(LAZY),
@@ -341,6 +348,23 @@ public class EspecieServiceImpl implements EspecieService {
         // Baja logica: varias tablas apuntan a especie por llave foranea, un
         // DELETE fisico romperia esas referencias.
         entidad.setActiva(false);
+    }
+
+    /**
+     * Normaliza sobre el propio Request los textos que participan en
+     * comprobaciones de unicidad, para que la consulta de duplicados y el
+     * INSERT/UPDATE usen exactamente el mismo valor. Debe llamarse antes de
+     * cualquier consulta; ver {@link Textos}.
+     */
+    private void normalizar(EspecieRequest request) {
+        request.setNombreCientifico(Textos.normalizar(request.getNombreCientifico()));
+        normalizar(request.getTaxonomia());
+    }
+
+    /** Normaliza genero y especie taxonomica, que forman parte de {@code uk_taxonomia}. */
+    private void normalizar(TaxonomiaRequest clasificacion) {
+        clasificacion.setGenero(Textos.normalizar(clasificacion.getGenero()));
+        clasificacion.setEspecieTaxonomica(Textos.normalizar(clasificacion.getEspecieTaxonomica()));
     }
 
     /**

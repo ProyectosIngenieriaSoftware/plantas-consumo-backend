@@ -10,9 +10,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -21,6 +24,22 @@ import tools.jackson.databind.exc.InvalidFormatException;
 import tools.jackson.databind.exc.InvalidNullException;
 import tools.jackson.databind.exc.MismatchedInputException;
 
+/**
+ * Captura en un solo lugar las excepciones de toda la API y las convierte en
+ * respuestas HTTP con un cuerpo {@link ErrorResponse} uniforme.
+ * Gracias a esto los controladores quedan libres de bloques try/catch.
+ * <p>
+ * El manejador de {@link DataIntegrityViolationException} es una <em>red de
+ * seguridad</em>, no el mecanismo previsto: cubre de golpe las restricciones de
+ * todas las tablas del esquema, pero su mensaje es necesariamente generico. Si
+ * un cliente recibe ese 409 generico, significa que a algun servicio le falta
+ * anticipar su propia restriccion y devolver un mensaje especifico.
+ * <p>
+ * El proyecto usa Jackson 3 (paquete {@code tools.jackson}) sobre Spring Boot 4:
+ * las excepciones de deserializacion que se inspeccionan aqui son las de ese
+ * paquete. No deben cambiarse los imports a {@code com.fasterxml.jackson}, que
+ * es Jackson 2 y no interviene en la lectura de las peticiones.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -308,6 +327,107 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(cuerpo);
+    }
+
+    /**
+     * Ruta sin controlador (por ejemplo {@code /api/habitats/} con barra
+     * final) -> 404 NOT FOUND, sin exponer el stack trace.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> manejarRutaInexistente(
+            NoResourceFoundException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.NOT_FOUND.value())
+                .error("Recurso no encontrado")
+                .mensaje("La ruta solicitada no existe")
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(cuerpo);
+    }
+
+    /**
+     * Falta un {@code @RequestParam} obligatorio -> 400 BAD REQUEST.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> manejarParametroFaltante(
+            MissingServletRequestParameterException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.BAD_REQUEST.value())
+                .error("Parámetro requerido")
+                .mensaje("Falta el parámetro obligatorio '" + ex.getParameterName() + "'")
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(cuerpo);
+    }
+
+    /**
+     * {@link ResponseStatusException} lanzada por algún servicio -> el código
+     * que trae la propia excepción.
+     * <p>
+     * La convención del proyecto es lanzar sus propias excepciones
+     * ({@link RecursoNoEncontradoException}, {@link RecursoDuplicadoException},
+     * {@link EstadoInvalidoException}…), que ya tienen manejador aquí. Este
+     * existe solo para que las {@code ResponseStatusException} que aún quedan
+     * no pierdan su mensaje: sin él las atendería el controlador de errores de
+     * Spring, que con {@code server.error.include-message=never} lo descarta y
+     * además no responde en formato {@link ErrorResponse}.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> manejarResponseStatus(
+            ResponseStatusException ex,
+            HttpServletRequest request) {
+
+        int codigo = ex.getStatusCode().value();
+        String error = textoDelCodigo(codigo);
+        String mensaje = ex.getReason() != null
+                ? ex.getReason()
+                : "La solicitud no pudo completarse (" + codigo + " " + error + ")";
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(codigo)
+                .error(error)
+                .mensaje(mensaje)
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity
+                .status(ex.getStatusCode())
+                .body(cuerpo);
+    }
+
+    /**
+     * Texto en español de los códigos HTTP habituales; para el resto, la frase
+     * estándar en inglés de {@link HttpStatus}.
+     */
+    private static String textoDelCodigo(int codigo) {
+        return switch (codigo) {
+            case 400 -> "Solicitud incorrecta";
+            case 401 -> "No autorizado";
+            case 403 -> "Prohibido";
+            case 404 -> "Recurso no encontrado";
+            case 405 -> "Método no permitido";
+            case 409 -> "Conflicto";
+            case 422 -> "Entidad no procesable";
+            case 500 -> "Error interno del servidor";
+            case 503 -> "Servicio no disponible";
+            default -> {
+                HttpStatus estado = HttpStatus.resolve(codigo);
+                yield estado != null ? estado.getReasonPhrase() : "Error " + codigo;
+            }
+        };
     }
 
     /**

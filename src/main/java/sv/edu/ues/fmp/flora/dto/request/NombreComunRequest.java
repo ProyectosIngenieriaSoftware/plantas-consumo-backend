@@ -2,6 +2,7 @@ package sv.edu.ues.fmp.flora.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,6 +26,8 @@ public class NombreComunRequest {
 
     @NotBlank(message = "El nombre es obligatorio")
     @Size(max = 150, message = "El nombre no puede exceder 150 caracteres")
+    @Pattern(regexp = "(?s).*\\p{L}.*",
+             message = "El nombre debe contener al menos una letra")
     private String nombre;
 
     @Size(max = 150, message = "La región no puede exceder 150 caracteres")

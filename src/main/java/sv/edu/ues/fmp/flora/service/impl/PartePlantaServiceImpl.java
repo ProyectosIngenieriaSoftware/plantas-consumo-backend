@@ -16,6 +16,7 @@ import sv.edu.ues.fmp.flora.exception.RecursoNoEncontradoException;
 import sv.edu.ues.fmp.flora.mapper.PartePlantaMapper;
 import sv.edu.ues.fmp.flora.repository.PartePlantaRepository;
 import sv.edu.ues.fmp.flora.service.PartePlantaService;
+import sv.edu.ues.fmp.flora.util.Textos;
 
 /**
  * Implementacion de la logica de negocio de las partes de planta.
@@ -77,6 +78,10 @@ public class PartePlantaServiceImpl implements PartePlantaService {
     @Override
     @Transactional
     public PartePlantaResponse crear(PartePlantaRequest request) {
+        // Se normaliza sobre el propio Request para que la consulta de
+        // duplicados y el INSERT usen el mismo valor (ver Textos).
+        request.setNombre(Textos.normalizar(request.getNombre()));
+
         if (partePlantaRepository.existsByNombreIgnoreCase(request.getNombre())) {
             throw new RecursoDuplicadoException(
                     "Ya existe una parte de planta con el nombre " + request.getNombre());
@@ -92,6 +97,9 @@ public class PartePlantaServiceImpl implements PartePlantaService {
     @Override
     @Transactional
     public PartePlantaResponse actualizar(Long id, PartePlantaRequest request) {
+        // Igual que en crear(): la consulta y el UPDATE deben ver el mismo valor.
+        request.setNombre(Textos.normalizar(request.getNombre()));
+
         PartePlanta entidad = buscarOFallar(id);
 
         Optional<PartePlanta> conMismoNombre =

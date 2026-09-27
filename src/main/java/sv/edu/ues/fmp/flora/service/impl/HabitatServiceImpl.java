@@ -2,7 +2,6 @@ package sv.edu.ues.fmp.flora.service.impl;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,6 +17,7 @@ import sv.edu.ues.fmp.flora.exception.RecursoNoEncontradoException;
 import sv.edu.ues.fmp.flora.mapper.HabitatMapper;
 import sv.edu.ues.fmp.flora.repository.HabitatRepository;
 import sv.edu.ues.fmp.flora.service.HabitatService;
+import sv.edu.ues.fmp.flora.util.Textos;
 
 @Service
 @RequiredArgsConstructor
@@ -72,21 +72,14 @@ public class HabitatServiceImpl implements HabitatService {
     @Override
     @Transactional
     public HabitatResponse crear(HabitatRequest request) {
-        Optional<Habitat> existente = habitatRepository.findByNombreIgnoreCase(request.getNombre().trim());
-        if (existente.isPresent()) {
-            Habitat h = existente.get();
-            if (Boolean.FALSE.equals(h.getActivo())) {
-                // Si el hábitat ya existe pero estaba inactivo, lo reactivamos automáticamente
-                h.setActivo(true);
-                if (request.getDescripcion() != null) {
-                    h.setDescripcion(request.getDescripcion());
-                }
-                Habitat guardado = habitatRepository.save(h);
-                return habitatMapper.toResponse(guardado);
-            }
-            throw new RecursoDuplicadoException(
-                    "Ya existe un hábitat con el nombre " + request.getNombre().trim());
-        }
+        // Se normaliza sobre el propio Request para que la consulta de
+        // duplicados y el INSERT usen el mismo valor (ver Textos).
+        request.setNombre(Textos.normalizar(request.getNombre()));
+
+        // El nombre nunca se reutiliza, ni siquiera el de un hábitat
+        // desactivado: para recuperarlo está PATCH /{id}/activar.
+        habitatRepository.findByNombreIgnoreCase(request.getNombre())
+                .ifPresent(existente -> lanzarDuplicado(existente, true));
 
         Habitat nuevo = habitatMapper.toEntity(request);
         if (nuevo.getActivo() == null) {
@@ -100,18 +93,16 @@ public class HabitatServiceImpl implements HabitatService {
     @Override
     @Transactional
     public HabitatResponse actualizar(Long id, HabitatRequest request) {
+        // Igual que en crear(): la consulta y el UPDATE deben ver el mismo valor.
+        request.setNombre(Textos.normalizar(request.getNombre()));
+
         Habitat entidad = buscarOFallar(id);
 
-        Optional<Habitat> conMismoNombre = habitatRepository.findByNombreIgnoreCase(request.getNombre().trim());
-        if (conMismoNombre.isPresent() && !conMismoNombre.get().getIdHabitat().equals(id)) {
-            Habitat h = conMismoNombre.get();
-            if (Boolean.FALSE.equals(h.getActivo())) {
-                throw new RecursoDuplicadoException(
-                        "El hábitat '" + request.getNombre().trim() + "' ya existe, pero está desactivado");
-            }
-            throw new RecursoDuplicadoException(
-                    "Ya existe otro hábitat con el nombre " + request.getNombre().trim());
-        }
+        // Conservar el propio nombre no es un choque: el filter descarta la
+        // coincidencia consigo mismo.
+        habitatRepository.findByNombreIgnoreCase(request.getNombre())
+                .filter(otro -> !otro.getIdHabitat().equals(id))
+                .ifPresent(otro -> lanzarDuplicado(otro, false));
 
         habitatMapper.updateEntity(entidad, request);
         return habitatMapper.toResponse(entidad);
@@ -122,6 +113,37 @@ public class HabitatServiceImpl implements HabitatService {
     public void desactivar(Long id) {
         Habitat entidad = buscarOFallar(id);
         entidad.setActivo(false);
+    }
+
+    @Override
+    @Transactional
+    public HabitatResponse activar(Long id) {
+        Habitat entidad = buscarOFallar(id);
+
+        // Idempotente: activar uno que ya está activo no es un error.
+        if (!Boolean.TRUE.equals(entidad.getActivo())) {
+            entidad.setActivo(true);
+        }
+
+        return habitatMapper.toResponse(entidad);
+    }
+
+    /**
+     * Rechaza con 409 un nombre que ya usa otro hábitat. El mensaje distingue
+     * si ese hábitat está desactivado, para indicar cómo recuperarlo.
+     *
+     * @param alCrear true desde crear(), donde el mensaje añade "en lugar de
+     *                crear uno nuevo"; en actualizar() esa coletilla no aplica
+     */
+    private void lanzarDuplicado(Habitat existente, boolean alCrear) {
+        if (Boolean.TRUE.equals(existente.getActivo())) {
+            throw new RecursoDuplicadoException(
+                    "Ya existe un hábitat con el nombre '" + existente.getNombre() + "'.");
+        }
+        throw new RecursoDuplicadoException(
+                "Ya existe el hábitat '" + existente.getNombre() + "', pero está desactivado. "
+                        + "Actívelo con PATCH /api/habitats/" + existente.getIdHabitat()
+                        + "/activar" + (alCrear ? " en lugar de crear uno nuevo." : "."));
     }
 
     private Habitat buscarOFallar(Long id) {

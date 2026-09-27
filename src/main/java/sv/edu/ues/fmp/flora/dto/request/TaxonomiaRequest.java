@@ -1,6 +1,7 @@
 package sv.edu.ues.fmp.flora.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,7 +16,8 @@ import lombok.Setter;
  * que el modelo no contempla.
  * <p>
  * {@code reino} es opcional: si llega null o vacio el mapper asigna "Plantae",
- * que es el unico valor que admite el CHECK de la tabla.
+ * que es el unico valor que admite el CHECK de la tabla. Cualquier otro valor
+ * se rechaza aqui con un 400, antes de llegar a ese CHECK.
  */
 @Getter
 @Setter
@@ -24,7 +26,14 @@ import lombok.Setter;
 @Builder
 public class TaxonomiaRequest {
 
+    /**
+     * El grupo opcional del patron es deliberado: vacio o ausente sigue siendo
+     * valido porque {@code TaxonomiaMapper.resolverReino} lo convierte en
+     * "Plantae". Exigir "plantae" literal romperia ese comportamiento.
+     */
     @Size(max = 100, message = "El reino no puede exceder 100 caracteres")
+    @Pattern(regexp = "(?i)^\\s*(plantae)?\\s*$",
+             message = "El reino debe ser 'Plantae'; este catálogo es exclusivamente de flora")
     private String reino;
 
     @Size(max = 100, message = "La división no puede exceder 100 caracteres")
