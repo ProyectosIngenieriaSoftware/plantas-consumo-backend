@@ -17,9 +17,13 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import sv.edu.ues.fmp.flora.entity.enums.EspecieHabitatId;
 
-/** Relacion sin identidad artificial ni cascadas hacia sus entidades padre. */
+/**
+ * Asociación entre una especie y un hábitat, con identidad compuesta y sin cascadas.
+ * Implementa Persistable porque una clave asignada no significa que la fila exista:
+ * las relaciones nuevas deben usar persist (INSERT), no merge, para que una creación
+ * concurrente no sobrescriba la observación de una relación ya insertada.
+ */
 @Entity
 @Table(name = "especie_habitat")
 @Getter

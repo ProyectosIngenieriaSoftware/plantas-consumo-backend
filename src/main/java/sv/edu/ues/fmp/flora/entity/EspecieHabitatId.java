@@ -1,4 +1,4 @@
-package sv.edu.ues.fmp.flora.entity.enums;
+package sv.edu.ues.fmp.flora.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
