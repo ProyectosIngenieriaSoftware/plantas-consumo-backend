@@ -35,6 +35,7 @@ public class EspecieParteComestibleController {
 
     @Operation(summary = "Obtener una parte comestible por su id")
     @ApiResponse(responseCode = "200", description = "Parte comestible encontrada")
+    @ApiResponse(responseCode = "400", description = "El id no tiene formato numérico")
     @ApiResponse(responseCode = "404", description = "No existe una parte comestible con ese id")
     @GetMapping("/{id}")
     public ResponseEntity<EspecieParteComestibleResponse> obtenerPorId(@PathVariable Long id) {
@@ -42,13 +43,18 @@ public class EspecieParteComestibleController {
     }
 
     @Operation(summary = "Actualizar una parte comestible",
-            description = "Solo edita descripción y advertencias. La parte de planta asociada "
+            description = "Solo edita descripción y advertencias. Reemplaza descripcion y "
+                    + "advertencias: un campo omitido o nulo queda vacío. Envíe ambos campos "
+                    + "aunque solo quiera cambiar uno. La parte de planta asociada "
                     + "NO puede cambiarse: preparaciones, aportes nutricionales, épocas de "
                     + "cosecha, beneficios, imágenes y videos cuelgan de este registro, y "
-                    + "cambiarla los movería a otra parte. Si se envía idPartePlanta, se ignora. "
-                    + "Para otra parte, registre una nueva.")
+                    + "cambiarla los movería a otra parte. Enviar idPartePlanta con valor se "
+                    + "rechaza con 400. Para otra parte, desactive esta y registre una nueva.")
     @ApiResponse(responseCode = "200", description = "Parte comestible actualizada")
-    @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "400",
+            description = "El id no tiene formato numérico, el cuerpo no es válido, o se envió "
+                    + "idPartePlanta: la parte no se puede modificar "
+                    + "(erroresValidacion.idPartePlanta)")
     @ApiResponse(responseCode = "404", description = "No existe una parte comestible con ese id")
     @PutMapping("/{id}")
     public ResponseEntity<EspecieParteComestibleResponse> actualizar(
@@ -62,6 +68,7 @@ public class EspecieParteComestibleController {
             description = "No borra la fila: seis tablas la referencian por llave foránea. "
                     + "Repetir la baja no es un error.")
     @ApiResponse(responseCode = "204", description = "Parte comestible desactivada")
+    @ApiResponse(responseCode = "400", description = "El id no tiene formato numérico")
     @ApiResponse(responseCode = "404", description = "No existe una parte comestible con ese id")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> desactivar(@PathVariable Long id) {
@@ -76,6 +83,7 @@ public class EspecieParteComestibleController {
     @Operation(summary = "Reactivar una parte comestible dada de baja",
             description = "Idempotente: si ya está activa se devuelve sin cambios.")
     @ApiResponse(responseCode = "200", description = "Parte comestible activa")
+    @ApiResponse(responseCode = "400", description = "El id no tiene formato numérico")
     @ApiResponse(responseCode = "404", description = "No existe una parte comestible con ese id")
     @ApiResponse(responseCode = "409", description = "La parte del catálogo está desactivada")
     @PatchMapping("/{id}/activar")

@@ -40,6 +40,8 @@ public class EspecieParteComestibleAnidadoController {
             description = "Ordenadas por nombre de la parte. Con soloActivas=true omite "
                     + "las que fueron dadas de baja lógica.")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
+    @ApiResponse(responseCode = "400",
+            description = "idEspecie no es numérico o soloActivas no es true/false")
     @ApiResponse(responseCode = "404", description = "La especie no existe")
     @GetMapping
     public ResponseEntity<List<EspecieParteComestibleResponse>> listar(
@@ -55,7 +57,9 @@ public class EspecieParteComestibleAnidadoController {
                     + "activa o no. Si ya existe desactivada, hay que reactivarla con "
                     + "PATCH /api/partes-comestibles/{id}/activar en lugar de crearla otra vez.")
     @ApiResponse(responseCode = "201", description = "Parte comestible registrada")
-    @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "400",
+            description = "idEspecie no es numérico, el JSON está mal formado, un campo tiene "
+                    + "un tipo de dato incorrecto o falta idPartePlanta")
     @ApiResponse(responseCode = "404", description = "La especie o la parte de planta no existe")
     @ApiResponse(responseCode = "409",
             description = "La especie ya tiene esa parte, o la especie o la parte del catálogo "
