@@ -50,4 +50,10 @@ public interface EspecieService {
 
     /** Baja logica. Nunca DELETE fisico: varias tablas referencian la especie. */
     void desactivar(Long id);
+
+    /**
+     * Revierte la baja logica. Idempotente. Conserva el estado de publicacion,
+     * asi que una especie PUBLICADA vuelve al catalogo publico de inmediato.
+     */
+    EspecieResponse activar(Long id);
 }
