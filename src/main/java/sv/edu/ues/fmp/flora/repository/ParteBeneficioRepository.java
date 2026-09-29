@@ -14,7 +14,7 @@ public interface ParteBeneficioRepository extends JpaRepository<ParteBeneficio, 
 
     List<ParteBeneficio> findByActivaTrue();
 
-    // SQL nativo mientras falta EspecieParteComestible.
+    // SQL nativo por que mientras falta EspecieParteComestible.
     @Query(value = """
             SELECT activa
             FROM public.especie_parte_comestible
