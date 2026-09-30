@@ -14,9 +14,11 @@ import java.math.BigDecimal;
 @Builder
 public class AporteNutricionalResponse {
     private Long idAporte;
-    private Long idEspecieParte;
 
-    // Devolvemos el ID y el Nombre para facilitar el trabajo al frontend
+    private Long idEspecieParte;
+    private String especieNombreCientifico;
+    private String parteNombre;
+
     private Long idNutriente;
     private String nutrienteNombre;
 

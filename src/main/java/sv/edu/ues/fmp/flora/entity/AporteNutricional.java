@@ -30,9 +30,9 @@ public class AporteNutricional {
     @Column(name = "id_aporte", nullable = false, updatable = false)
     private Long idAporte;
 
-    // Se mapea como ID simple temporalmente hasta que crees la entidad EspecieParteComestible
-    @Column(name = "id_especie_parte", nullable = false)
-    private Long idEspecieParte;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_especie_parte", nullable = false)
+    private EspecieParteComestible especieParteComestible;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_nutriente", nullable = false)
@@ -51,6 +51,6 @@ public class AporteNutricional {
     @Column(name = "porcion_referencia", length = 100, nullable = false)
     private String porcionReferencia;
 
-    @Column(name = "observacion", columnDefinition = "text")
+    @Column(name = "observacion", columnDefinition = "text", nullable = false)
     private String observacion;
 }

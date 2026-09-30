@@ -39,5 +39,7 @@ public class AporteNutricionalRequest {
     @Size(max = 100, message = "La porción de referencia no puede exceder 100 caracteres")
     private String porcionReferencia;
 
+    @NotBlank(message = "La observación es obligatoria y no puede quedar vacía o con solo espacios")
+    @Size(min = 4, message = "La observación debe tener al menos 4 caracteres")
     private String observacion;
 }

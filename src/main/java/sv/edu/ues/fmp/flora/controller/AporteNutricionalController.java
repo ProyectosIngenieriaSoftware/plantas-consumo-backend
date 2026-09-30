@@ -33,6 +33,12 @@ public class AporteNutricionalController {
         return ResponseEntity.ok(aporteService.listarPorEspecieParte(idEspecieParte));
     }
 
+    @Operation(summary = "Listar aportes por nutriente", description = "Obtiene todas las plantas/partes que aportan un nutriente específico.")
+    @GetMapping("/nutriente/{idNutriente}")
+    public ResponseEntity<List<AporteNutricionalResponse>> listarPorNutriente(@PathVariable Long idNutriente) {
+        return ResponseEntity.ok(aporteService.listarPorNutriente(idNutriente));
+    }
+
     @Operation(summary = "Obtener un aporte nutricional por ID")
     @GetMapping("/{id}")
     public ResponseEntity<AporteNutricionalResponse> obtenerPorId(@PathVariable Long id) {
