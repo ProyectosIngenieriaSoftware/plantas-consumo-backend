@@ -35,6 +35,11 @@ public class ParteBeneficio implements Persistable<ParteBeneficioId> {
     @EmbeddedId
     private ParteBeneficioId id;
 
+    @MapsId("idEspecieParte")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "id_especie_parte", nullable = false)
+    private EspecieParteComestible especieParteComestible;
+
     @MapsId("idBeneficio")
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "id_beneficio", nullable = false)

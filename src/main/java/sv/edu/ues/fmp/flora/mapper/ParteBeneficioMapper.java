@@ -6,6 +6,7 @@ import sv.edu.ues.fmp.flora.dto.request.ParteBeneficioRequest;
 import sv.edu.ues.fmp.flora.dto.request.ParteBeneficioUpdateRequest;
 import sv.edu.ues.fmp.flora.dto.response.ParteBeneficioResponse;
 import sv.edu.ues.fmp.flora.entity.Beneficio;
+import sv.edu.ues.fmp.flora.entity.EspecieParteComestible;
 import sv.edu.ues.fmp.flora.entity.Fuente;
 import sv.edu.ues.fmp.flora.entity.ParteBeneficio;
 import sv.edu.ues.fmp.flora.entity.enums.ParteBeneficioId;
@@ -15,6 +16,7 @@ public class ParteBeneficioMapper {
 
     public ParteBeneficio toEntity(
             ParteBeneficioRequest request,
+            EspecieParteComestible parteComestible,
             Beneficio beneficio,
             Fuente fuente
     ) {
@@ -23,6 +25,7 @@ public class ParteBeneficioMapper {
                         request.getIdEspecieParte(),
                         request.getIdBeneficio()
                 ))
+                .especieParteComestible(parteComestible)
                 .beneficio(beneficio)
                 .fuente(fuente)
                 .observacion(normalizar(request.getObservacion()))

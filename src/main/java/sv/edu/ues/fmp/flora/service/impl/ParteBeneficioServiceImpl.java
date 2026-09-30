@@ -10,6 +10,7 @@ import sv.edu.ues.fmp.flora.dto.request.ParteBeneficioRequest;
 import sv.edu.ues.fmp.flora.dto.request.ParteBeneficioUpdateRequest;
 import sv.edu.ues.fmp.flora.dto.response.ParteBeneficioResponse;
 import sv.edu.ues.fmp.flora.entity.Beneficio;
+import sv.edu.ues.fmp.flora.entity.EspecieParteComestible;
 import sv.edu.ues.fmp.flora.entity.Fuente;
 import sv.edu.ues.fmp.flora.entity.ParteBeneficio;
 import sv.edu.ues.fmp.flora.entity.enums.ParteBeneficioId;
@@ -19,6 +20,7 @@ import sv.edu.ues.fmp.flora.exception.RecursoDuplicadoException;
 import sv.edu.ues.fmp.flora.exception.RecursoNoEncontradoException;
 import sv.edu.ues.fmp.flora.mapper.ParteBeneficioMapper;
 import sv.edu.ues.fmp.flora.repository.BeneficioRepository;
+import sv.edu.ues.fmp.flora.repository.EspecieParteComestibleRepository;
 import sv.edu.ues.fmp.flora.repository.FuenteRepository;
 import sv.edu.ues.fmp.flora.repository.ParteBeneficioRepository;
 import sv.edu.ues.fmp.flora.service.ParteBeneficioService;
@@ -29,6 +31,7 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
 
     private final ParteBeneficioRepository parteBeneficioRepository;
     private final BeneficioRepository beneficioRepository;
+    private final EspecieParteComestibleRepository especieParteComestibleRepository;
     private final FuenteRepository fuenteRepository;
     private final ParteBeneficioMapper parteBeneficioMapper;
 
@@ -76,7 +79,7 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
             throw duplicado(id);
         }
 
-        Boolean parteActiva = buscarEstadoParte(
+        EspecieParteComestible parteComestible = buscarParteComestible(
                 id.getIdEspecieParte()
         );
 
@@ -88,13 +91,14 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
 
         validarRelacionesActivas(
                 id.getIdEspecieParte(),
-                parteActiva,
+                parteComestible.getActiva(),
                 beneficio,
                 fuente
         );
 
         ParteBeneficio nueva = parteBeneficioMapper.toEntity(
                 request,
+                parteComestible,
                 beneficio,
                 fuente
         );
@@ -129,12 +133,12 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
          * una asociación que seguirá activa.
          */
         if (quedaraActiva) {
-            Boolean parteActiva = buscarEstadoParte(idEspecieParte);
+            EspecieParteComestible parteComestible = buscarParteComestible(idEspecieParte);
             Beneficio beneficio = buscarBeneficio(idBeneficio);
 
             validarRelacionesActivas(
                     idEspecieParte,
-                    parteActiva,
+                    parteComestible.getActiva(),
                     beneficio,
                     fuente
             );
@@ -190,9 +194,8 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
         }
     }
 
-    private Boolean buscarEstadoParte(Long idEspecieParte) {
-        return parteBeneficioRepository
-                .buscarEstadoParteComestible(idEspecieParte)
+    private EspecieParteComestible buscarParteComestible(Long idEspecieParte) {
+        return especieParteComestibleRepository.findById(idEspecieParte)
                 .orElseThrow(() -> new RecursoNoEncontradoException(
                         "No existe la parte comestible con id "
                                 + idEspecieParte
