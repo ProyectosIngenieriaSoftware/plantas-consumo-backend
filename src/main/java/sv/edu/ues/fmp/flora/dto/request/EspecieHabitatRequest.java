@@ -7,15 +7,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** Datos para asociar un hábitat; la especie se obtiene de la URL. */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class EspecieHabitatRequest {
-
-    @NotNull(message = "La especie es obligatoria")
-    private Long idEspecie;
 
     @NotNull(message = "El hábitat es obligatorio")
     private Long idHabitat;

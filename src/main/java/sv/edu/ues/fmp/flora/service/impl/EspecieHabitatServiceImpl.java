@@ -1,7 +1,8 @@
 package sv.edu.ues.fmp.flora.service.impl;
 
 import java.util.List;
-import java.util.Objects;
+import org.springframework.data.domain.Sort;
+import sv.edu.ues.fmp.flora.dto.request.EspecieHabitatActualizarRequest;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -11,8 +12,8 @@ import sv.edu.ues.fmp.flora.dto.response.EspecieHabitatResponse;
 import sv.edu.ues.fmp.flora.entity.Especie;
 import sv.edu.ues.fmp.flora.entity.EspecieHabitat;
 import sv.edu.ues.fmp.flora.entity.Habitat;
-import sv.edu.ues.fmp.flora.entity.enums.EspecieHabitatId;
-import sv.edu.ues.fmp.flora.exception.IdInvalidoException;
+import sv.edu.ues.fmp.flora.entity.EspecieHabitatId;
+import sv.edu.ues.fmp.flora.exception.EstadoInvalidoException;
 import sv.edu.ues.fmp.flora.exception.RecursoDuplicadoException;
 import sv.edu.ues.fmp.flora.exception.RecursoNoEncontradoException;
 import sv.edu.ues.fmp.flora.mapper.EspecieHabitatMapper;
@@ -21,6 +22,7 @@ import sv.edu.ues.fmp.flora.repository.EspecieRepository;
 import sv.edu.ues.fmp.flora.repository.HabitatRepository;
 import sv.edu.ues.fmp.flora.service.EspecieHabitatService;
 
+/** Aplica las reglas de asociación y coordina repositorios y conversiones en transacciones. */
 @Service
 @RequiredArgsConstructor
 public class EspecieHabitatServiceImpl implements EspecieHabitatService {
@@ -37,7 +39,7 @@ public class EspecieHabitatServiceImpl implements EspecieHabitatService {
     @Override
     @Transactional(readOnly = true)
     public List<EspecieHabitatResponse> listarTodos() {
-        return especieHabitatRepository.findAll().stream()
+        return especieHabitatRepository.findAll(Sort.by("habitat.nombre")).stream()
                 .map(especieHabitatMapper::toResponse).toList();
     }
 
@@ -61,7 +63,7 @@ public class EspecieHabitatServiceImpl implements EspecieHabitatService {
         if (!especieRepository.existsById(idEspecie)) {
             throw new RecursoNoEncontradoException("No existe la especie con id " + idEspecie);
         }
-        return especieHabitatRepository.findByEspecieIdEspecie(idEspecie).stream()
+        return especieHabitatRepository.findByEspecieIdEspecieOrderByHabitatNombreAsc(idEspecie).stream()
                 .map(especieHabitatMapper::toResponse).toList();
     }
 
@@ -87,39 +89,39 @@ public class EspecieHabitatServiceImpl implements EspecieHabitatService {
      */
     @Override
     @Transactional
-    public EspecieHabitatResponse crear(EspecieHabitatRequest request) {
-        validarIdsObligatorios(request);
-        Especie especie = especieRepository.findById(request.getIdEspecie())
+    public EspecieHabitatResponse crear(Long idEspecie, EspecieHabitatRequest request) {
+        Especie especie = especieRepository.findById(idEspecie)
                 .orElseThrow(() -> new RecursoNoEncontradoException(
-                        "No existe la especie con id " + request.getIdEspecie()));
+                        "No existe la especie con id " + idEspecie));
         Habitat habitat = habitatRepository.findById(request.getIdHabitat())
                 .orElseThrow(() -> new RecursoNoEncontradoException(
                         "No existe el hábitat con id " + request.getIdHabitat()));
-        EspecieHabitatId id = new EspecieHabitatId(request.getIdEspecie(), request.getIdHabitat());
+        if (!Boolean.TRUE.equals(especie.getActiva())) {
+            throw new EstadoInvalidoException("No se puede asociar la especie '"
+                    + especie.getNombreCientifico() + "' porque está desactivada.");
+        }
+        if (!Boolean.TRUE.equals(habitat.getActivo())) {
+            throw new EstadoInvalidoException("No se puede asociar el hábitat '"
+                    + habitat.getNombre() + "' porque está desactivado.");
+        }
+        EspecieHabitatId id = new EspecieHabitatId(idEspecie, request.getIdHabitat());
         if (especieHabitatRepository.existsById(id)) {
-            throw new RecursoDuplicadoException("Ya existe la relación entre la especie "
-                    + request.getIdEspecie() + " y el hábitat " + request.getIdHabitat());
+            throw new RecursoDuplicadoException("La especie '" + especie.getNombreCientifico()
+                    + "' ya está asociada al hábitat '" + habitat.getNombre() + "'.");
         }
         EspecieHabitat nueva = especieHabitatMapper.toEntity(request, especie, habitat);
         return especieHabitatMapper.toResponse(especieHabitatRepository.saveAndFlush(nueva));
     }
 
     /**
-     * Comprueba que el request conserve la clave compuesta de la ruta y modifica
+     * Utiliza la clave compuesta de la ruta y modifica
      * solo la observación. La entidad permanece gestionada: Hibernate guarda el
      * cambio al confirmar la transacción, sin necesitar otra llamada a save.
      */
     @Override
     @Transactional
     public EspecieHabitatResponse actualizar(
-            Long idEspecie, Long idHabitat, EspecieHabitatRequest request) {
-        validarIdsObligatorios(request);
-        if (!Objects.equals(idEspecie, request.getIdEspecie())
-                || !Objects.equals(idHabitat, request.getIdHabitat())) {
-            throw new IdInvalidoException(
-                    "Los IDs del cuerpo deben coincidir con la ruta. "
-                            + "Para cambiar la especie o el hábitat, elimine la relación y cree otra.");
-        }
+            Long idEspecie, Long idHabitat, EspecieHabitatActualizarRequest request) {
         EspecieHabitat entidad = buscarOFallar(idEspecie, idHabitat);
         especieHabitatMapper.updateEntity(entidad, request);
         return especieHabitatMapper.toResponse(entidad);
@@ -146,13 +148,4 @@ public class EspecieHabitatServiceImpl implements EspecieHabitatService {
                                 + " y el hábitat " + idHabitat));
     }
 
-    /**
-     * Rechaza IDs nulos también cuando el servicio se invoca fuera del controlador,
-     * donde no se ejecutaría la validación del cuerpo HTTP.
-     */
-    private void validarIdsObligatorios(EspecieHabitatRequest request) {
-        if (request.getIdEspecie() == null || request.getIdHabitat() == null) {
-            throw new IdInvalidoException("La especie y el hábitat son obligatorios");
-        }
-    }
 }

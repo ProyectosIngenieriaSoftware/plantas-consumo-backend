@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** Resumen de la relación con los IDs y nombres de sus entidades asociadas. */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -14,7 +15,7 @@ import lombok.Setter;
 public class EspecieHabitatResponse {
     private Long idEspecie;
     private Long idHabitat;
-    private String nombreEspecie;
+    private String nombreCientificoEspecie;
     private String nombreHabitat;
     private String observacion;
 }

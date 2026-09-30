@@ -1,9 +1,11 @@
 package sv.edu.ues.fmp.flora.service;
 
 import java.util.List;
+import sv.edu.ues.fmp.flora.dto.request.EspecieHabitatActualizarRequest;
 import sv.edu.ues.fmp.flora.dto.request.EspecieHabitatRequest;
 import sv.edu.ues.fmp.flora.dto.response.EspecieHabitatResponse;
 
+/** Operaciones para consultar y gestionar las asociaciones de especies y hábitats. */
 public interface EspecieHabitatService {
     /**
      * Obtiene todas las relaciones como DTOs de respuesta.
@@ -27,12 +29,12 @@ public interface EspecieHabitatService {
      * Crea una relación después de validar los IDs, la existencia de ambos padres
      * y la ausencia de la misma combinación.
      */
-    EspecieHabitatResponse crear(EspecieHabitatRequest request);
+    EspecieHabitatResponse crear(Long idEspecie, EspecieHabitatRequest request);
     /**
      * Actualiza únicamente la observación de una relación existente.
-     * Los IDs del request deben coincidir con los que identifican la relación.
+     * La clave se toma de la URL y no puede modificarse.
      */
-    EspecieHabitatResponse actualizar(Long idEspecie, Long idHabitat, EspecieHabitatRequest request);
+    EspecieHabitatResponse actualizar(Long idEspecie, Long idHabitat, EspecieHabitatActualizarRequest request);
     /**
      * Elimina únicamente la relación; falla si la combinación no existe.
      */
