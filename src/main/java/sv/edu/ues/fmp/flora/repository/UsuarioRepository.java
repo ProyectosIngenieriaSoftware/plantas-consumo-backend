@@ -1,8 +1,9 @@
 package sv.edu.ues.fmp.flora.repository;
 
-import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -19,7 +20,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     Optional<Usuario> findByNombreUsuarioIgnoreCase(String nombreUsuario);
 
-    List<Usuario> findByActivoTrue();
+    Page<Usuario> findByActivoTrue(Pageable pageable);
 
     Optional<Usuario> findByCorreoIgnoreCaseOrNombreUsuarioIgnoreCase(String correo, String nombreUsuario);
 }

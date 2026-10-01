@@ -1,7 +1,5 @@
 package sv.edu.ues.fmp.flora.controller;
 
-import java.util.List;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,6 +23,7 @@ import sv.edu.ues.fmp.flora.dto.request.UsuarioCambioClaveRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioCreationRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioLoginRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioUpdateRequest;
+import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
 import sv.edu.ues.fmp.flora.dto.response.UsuarioResponse;
 import sv.edu.ues.fmp.flora.service.UsuarioService;
 
@@ -37,18 +36,23 @@ public class UsuarioController {
 
     private final UsuarioService usuarioService;
 
-    @Operation(summary = "Listar usuarios", description = "Devuelve el catálogo completo. Con soloActivos=true omite "
-                    + "las cuentas dadas de baja lógica.")
+    @Operation(summary = "Listar usuarios", description = "Devuelve el catálogo paginado. Con "
+                    + "soloActivos=true omite las cuentas dadas de baja lógica. pagina inicia "
+                    + "en 0; tamanio acepta de 1 a 100 elementos por página.")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
     @ApiResponse(responseCode = "400", description = "Parametro invalido")
     @GetMapping
-    public ResponseEntity<List<UsuarioResponse>> listar(
+    public ResponseEntity<PaginaResponse<UsuarioResponse>> listar(
             @Parameter(description = "Si es true, excluye las cuentas desactivadas")
-            @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos) {
+            @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos,
+            @Parameter(description = "Número de página, inicia en 0")
+            @RequestParam(name = "pagina", defaultValue = "0") int pagina,
+            @Parameter(description = "Cantidad de elementos por página (máximo 100)")
+            @RequestParam(name = "tamanio", defaultValue = "10") int tamanio) {
 
-        List<UsuarioResponse> respuesta = soloActivos
-                ? usuarioService.listarActivos()
-                : usuarioService.listarTodos();
+        PaginaResponse<UsuarioResponse> respuesta = soloActivos
+                ? usuarioService.listarActivos(pagina, tamanio)
+                : usuarioService.listarTodos(pagina, tamanio);
 
         return ResponseEntity.ok(respuesta);
     }

@@ -1,14 +1,14 @@
 package sv.edu.ues.fmp.flora.service.impl;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import sv.edu.ues.fmp.flora.dto.request.RolRequest;
+import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
 import sv.edu.ues.fmp.flora.dto.response.RolResponse;
 import sv.edu.ues.fmp.flora.entity.Rol;
 import sv.edu.ues.fmp.flora.exception.IdInvalidoException;
@@ -17,6 +17,7 @@ import sv.edu.ues.fmp.flora.exception.RecursoNoEncontradoException;
 import sv.edu.ues.fmp.flora.mapper.RolMapper;
 import sv.edu.ues.fmp.flora.repository.RolRepository;
 import sv.edu.ues.fmp.flora.service.RolService;
+import sv.edu.ues.fmp.flora.util.Paginacion;
 
 @Service
 @RequiredArgsConstructor
@@ -27,22 +28,16 @@ public class RolServiceImpl implements RolService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RolResponse> listarTodos() {
-        List<RolResponse> respuestas = new ArrayList<>();
-        for (Rol entidad : rolRepository.findAll()) {
-            respuestas.add(rolMapper.toResponse(entidad));
-        }
-        return respuestas;
+    public PaginaResponse<RolResponse> listarTodos(int pagina, int tamanio) {
+        Pageable pageable = Paginacion.armar(pagina, tamanio, "idRol");
+        return Paginacion.aRespuesta(rolRepository.findAll(pageable), rolMapper::toResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<RolResponse> listarActivos() {
-        List<RolResponse> respuestas = new ArrayList<>();
-        for (Rol entidad : rolRepository.findByActivoTrue()) {
-            respuestas.add(rolMapper.toResponse(entidad));
-        }
-        return respuestas;
+    public PaginaResponse<RolResponse> listarActivos(int pagina, int tamanio) {
+        Pageable pageable = Paginacion.armar(pagina, tamanio, "idRol");
+        return Paginacion.aRespuesta(rolRepository.findByActivoTrue(pageable), rolMapper::toResponse);
     }
 
     @Override

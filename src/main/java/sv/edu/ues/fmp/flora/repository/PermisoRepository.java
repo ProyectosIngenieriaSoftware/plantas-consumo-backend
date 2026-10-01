@@ -1,8 +1,9 @@
 package sv.edu.ues.fmp.flora.repository;
 
-import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -15,5 +16,5 @@ public interface PermisoRepository extends JpaRepository<Permiso, Long> {
 
     Optional<Permiso> findByCodigoIgnoreCase(String codigo);
 
-    List<Permiso> findByActivoTrue();
+    Page<Permiso> findByActivoTrue(Pageable pageable);
 }

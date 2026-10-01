@@ -1,15 +1,14 @@
 package sv.edu.ues.fmp.flora.service;
 
-import java.util.List;
-
 import sv.edu.ues.fmp.flora.dto.request.PermisoRequest;
+import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
 import sv.edu.ues.fmp.flora.dto.response.PermisoResponse;
 
 public interface PermisoService {
 
-    List<PermisoResponse> listarTodos();
+    PaginaResponse<PermisoResponse> listarTodos(int pagina, int tamanio);
 
-    List<PermisoResponse> listarActivos();
+    PaginaResponse<PermisoResponse> listarActivos(int pagina, int tamanio);
 
     PermisoResponse obtenerPorId(Long id);
 

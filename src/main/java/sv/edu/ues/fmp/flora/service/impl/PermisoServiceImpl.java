@@ -1,14 +1,14 @@
 package sv.edu.ues.fmp.flora.service.impl;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import sv.edu.ues.fmp.flora.dto.request.PermisoRequest;
+import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
 import sv.edu.ues.fmp.flora.dto.response.PermisoResponse;
 import sv.edu.ues.fmp.flora.entity.Permiso;
 import sv.edu.ues.fmp.flora.exception.IdInvalidoException;
@@ -17,6 +17,7 @@ import sv.edu.ues.fmp.flora.exception.RecursoNoEncontradoException;
 import sv.edu.ues.fmp.flora.mapper.PermisoMapper;
 import sv.edu.ues.fmp.flora.repository.PermisoRepository;
 import sv.edu.ues.fmp.flora.service.PermisoService;
+import sv.edu.ues.fmp.flora.util.Paginacion;
 
 @Service
 @RequiredArgsConstructor
@@ -27,22 +28,16 @@ public class PermisoServiceImpl implements PermisoService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PermisoResponse> listarTodos() {
-        List<PermisoResponse> respuestas = new ArrayList<>();
-        for (Permiso entidad : permisoRepository.findAll()) {
-            respuestas.add(permisoMapper.toResponse(entidad));
-        }
-        return respuestas;
+    public PaginaResponse<PermisoResponse> listarTodos(int pagina, int tamanio) {
+        Pageable pageable = Paginacion.armar(pagina, tamanio, "idPermiso");
+        return Paginacion.aRespuesta(permisoRepository.findAll(pageable), permisoMapper::toResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<PermisoResponse> listarActivos() {
-        List<PermisoResponse> respuestas = new ArrayList<>();
-        for (Permiso entidad : permisoRepository.findByActivoTrue()) {
-            respuestas.add(permisoMapper.toResponse(entidad));
-        }
-        return respuestas;
+    public PaginaResponse<PermisoResponse> listarActivos(int pagina, int tamanio) {
+        Pageable pageable = Paginacion.armar(pagina, tamanio, "idPermiso");
+        return Paginacion.aRespuesta(permisoRepository.findByActivoTrue(pageable), permisoMapper::toResponse);
     }
 
     @Override

@@ -1,7 +1,5 @@
 package sv.edu.ues.fmp.flora.controller;
 
-import java.util.List;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,6 +20,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import sv.edu.ues.fmp.flora.dto.request.PermisoRequest;
+import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
 import sv.edu.ues.fmp.flora.dto.response.PermisoResponse;
 import sv.edu.ues.fmp.flora.service.PermisoService;
 
@@ -35,17 +34,23 @@ public class PermisoController {
     private final PermisoService permisoService;
 
     @Operation(summary = "Listar permisos",
-            description = "Devuelve el catálogo completo. Con soloActivos=true omite "
-                    + "los permisos dados de baja lógica.")
+            description = "Devuelve el catálogo paginado. Con soloActivos=true omite "
+                    + "los permisos dados de baja lógica. pagina inicia en 0; tamanio acepta "
+                    + "de 1 a 100 elementos por página.")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
+    @ApiResponse(responseCode = "400", description = "Parametro invalido")
     @GetMapping
-    public ResponseEntity<List<PermisoResponse>> listar(
+    public ResponseEntity<PaginaResponse<PermisoResponse>> listar(
             @Parameter(description = "Si es true, excluye los permisos desactivados")
-            @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos) {
+            @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos,
+            @Parameter(description = "Número de página, inicia en 0")
+            @RequestParam(name = "pagina", defaultValue = "0") int pagina,
+            @Parameter(description = "Cantidad de elementos por página (máximo 100)")
+            @RequestParam(name = "tamanio", defaultValue = "10") int tamanio) {
 
-        List<PermisoResponse> respuesta = soloActivos
-                ? permisoService.listarActivos()
-                : permisoService.listarTodos();
+        PaginaResponse<PermisoResponse> respuesta = soloActivos
+                ? permisoService.listarActivos(pagina, tamanio)
+                : permisoService.listarTodos(pagina, tamanio);
 
         return ResponseEntity.ok(respuesta);
     }

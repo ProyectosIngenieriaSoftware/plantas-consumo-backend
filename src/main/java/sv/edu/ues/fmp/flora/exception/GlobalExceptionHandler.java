@@ -190,6 +190,48 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Parametro de paginacion fuera de rango -> 400 BAD REQUEST.
+     */
+    @ExceptionHandler(ParametroInvalidoException.class)
+    public ResponseEntity<ErrorResponse> manejarParametroInvalido(
+            ParametroInvalidoException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.BAD_REQUEST.value())
+                .error("Parámetro inválido")
+                .mensaje(ex.getMessage())
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(cuerpo);
+    }
+
+    /**
+     * Token de recuperacion de clave invalido, usado o expirado -> 400 BAD REQUEST.
+     */
+    @ExceptionHandler(TokenInvalidoException.class)
+    public ResponseEntity<ErrorResponse> manejarTokenInvalido(
+            TokenInvalidoException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.BAD_REQUEST.value())
+                .error("Token inválido")
+                .mensaje(ex.getMessage())
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(cuerpo);
+    }
+
+    /**
      * PathVariable o RequestParam con tipo incorrecto.
      */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
