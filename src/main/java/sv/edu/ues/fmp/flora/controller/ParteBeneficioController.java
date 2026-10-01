@@ -61,7 +61,7 @@ public class ParteBeneficioController {
 
     @Operation(summary = "Actualizar parte beneficio",
             description = "Permite editar la fuente, la observación y el estado. Fuente y observación son obligatorias. Los dos IDs de la URL no se modifican. "
-                    + "Si no envías activa, se conserva el estado actual; no se acepta null. Para dejar el registro activo, "
+                    + "Si omites activa o envías null, se conserva el estado actual. Para dejar el registro activo, "
                     + "la parte comestible, el beneficio y la fuente deben estar activos. También puedes editar un registro y mantenerlo inactivo.")
     @ApiResponse(responseCode = "200", description = "Parte beneficio actualizado")
     @ApiResponse(responseCode = "400", description = "Datos inválidos")

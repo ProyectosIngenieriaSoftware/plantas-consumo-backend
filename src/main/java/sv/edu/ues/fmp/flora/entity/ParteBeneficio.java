@@ -23,6 +23,14 @@ import org.springframework.data.domain.Persistable;
 
 import sv.edu.ues.fmp.flora.entity.enums.ParteBeneficioId;
 
+/**
+ * Relacion entre una parte comestible y un beneficio, con clave compuesta asignada.
+ * El ID se completa antes de guardar, por lo que no basta comprobar si es null
+ * para distinguir una entidad nueva. Persistable permite que Spring Data use
+ * isNew(): true selecciona persist (insercion) y false selecciona merge.
+ * Asi, crear una entidad con un ID existente no se trata como una actualizacion;
+ * la clave primaria de la base protege tambien frente a inserciones concurrentes.
+ */
 @Entity
 @Table(name = "parte_beneficio", schema = "public")
 @Getter
@@ -56,6 +64,7 @@ public class ParteBeneficio implements Persistable<ParteBeneficioId> {
     @Column(name = "activa", nullable = false)
     private Boolean activa = true;
     
+    // Estado interno de persistencia; no es una columna ni representa activa.
     @Transient
     @Builder.Default
     @Getter(AccessLevel.NONE)
@@ -67,6 +76,7 @@ public class ParteBeneficio implements Persistable<ParteBeneficioId> {
         return nueva;
     }
 
+    // Al cargar o insertar, la entidad deja de considerarse nueva.
     @PostLoad
     @PostPersist
     private void marcarComoPersistida() {

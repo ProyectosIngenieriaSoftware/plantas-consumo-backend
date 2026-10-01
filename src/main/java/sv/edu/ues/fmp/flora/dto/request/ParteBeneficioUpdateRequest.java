@@ -1,8 +1,5 @@
 package sv.edu.ues.fmp.flora.dto.request;
 
-import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.annotation.Nulls;
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -23,10 +20,7 @@ public class ParteBeneficioUpdateRequest {
     @NotBlank(message = "La observación es obligatoria y no puede estar vacía")
     private String observacion;
 
+    // Omitir activa o enviarla como null conserva el estado actual.
     private Boolean activa;
 
-    @JsonSetter(value = "activa", nulls = Nulls.FAIL)
-    public void setActiva(Boolean activa) {
-        this.activa = activa;
-    }
 }
