@@ -20,4 +20,6 @@ public interface HabitatService {
     HabitatResponse actualizar(Long id, HabitatRequest request);
 
     void desactivar(Long id);
+
+    HabitatResponse activar(Long id);
 }

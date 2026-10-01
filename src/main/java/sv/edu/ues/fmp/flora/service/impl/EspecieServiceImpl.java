@@ -28,6 +28,7 @@ import sv.edu.ues.fmp.flora.repository.TaxonomiaRepository;
 import sv.edu.ues.fmp.flora.repository.UsuarioRepository;
 import sv.edu.ues.fmp.flora.service.EspecieService;
 import sv.edu.ues.fmp.flora.service.NombreComunService;
+import sv.edu.ues.fmp.flora.util.Textos;
 
 /**
  * Implementacion de la logica de negocio de las especies.
@@ -84,6 +85,8 @@ public class EspecieServiceImpl implements EspecieService {
     @Override
     @Transactional
     public EspecieResponse crear(EspecieRequest request) {
+        normalizar(request);
+
         // La base tiene el indice unico funcional uk_especie_nombre_cientifico_lower
         // sobre lower(nombre_cientifico). Se valida aqui para devolver un 409
         // legible en vez de dejar que estalle la restriccion en el driver.
@@ -179,6 +182,8 @@ public class EspecieServiceImpl implements EspecieService {
     @Override
     @Transactional
     public EspecieResponse actualizar(Long id, EspecieRequest request) {
+        normalizar(request);
+
         Especie entidad = buscarOFallar(id);
 
         Optional<Especie> conMismoNombre =
@@ -206,10 +211,11 @@ public class EspecieServiceImpl implements EspecieService {
 
         // No se llama a save(): dentro de la transaccion la entidad esta
         // gestionada por el contexto de persistencia, asi que Hibernate detecta
-        // los cambios (dirty checking) y emite el UPDATE al hacer flush.
+        // los cambios (dirty checking) y emite el UPDATE al hacer flush, que
+        // responderActualizada() adelanta.
         // Ni el estado, ni las fechas, ni los usuarios de validacion o
         // publicacion se tocan aqui: eso solo cambia por las transiciones.
-        return especieMapper.toResponse(entidad);
+        return responderActualizada(entidad);
     }
 
     @Override
@@ -226,7 +232,7 @@ public class EspecieServiceImpl implements EspecieService {
 
         entidad.setEstadoPublicacion(EstadoPublicacion.EN_REVISION);
 
-        return especieMapper.toResponse(entidad);
+        return responderActualizada(entidad);
     }
 
     @Override
@@ -249,7 +255,7 @@ public class EspecieServiceImpl implements EspecieService {
 
         // El estado se mantiene EN_REVISION a proposito: validar no es publicar.
 
-        return especieMapper.toResponse(entidad);
+        return responderActualizada(entidad);
     }
 
     @Override
@@ -282,7 +288,7 @@ public class EspecieServiceImpl implements EspecieService {
         entidad.setPublicadaPor(publicador);
         entidad.setFechaPublicacion(LocalDateTime.now());
 
-        return especieMapper.toResponse(entidad);
+        return responderActualizada(entidad);
     }
 
     @Override
@@ -308,12 +314,14 @@ public class EspecieServiceImpl implements EspecieService {
         entidad.setValidadaPor(null);
         entidad.setFechaValidacion(null);
 
-        return especieMapper.toResponse(entidad);
+        return responderActualizada(entidad);
     }
 
     @Override
     @Transactional
     public EspecieResponse actualizarTaxonomia(Long idEspecie, TaxonomiaRequest request) {
+        normalizar(request);
+
         Especie entidad = buscarOFallar(idEspecie);
 
         // getTaxonomia() dispara aqui la carga perezosa del @OneToOne(LAZY),
@@ -329,8 +337,9 @@ public class EspecieServiceImpl implements EspecieService {
 
         // No se llama a save(): tanto la especie como su taxonomia estan
         // gestionadas por el contexto de persistencia, asi que Hibernate emite
-        // el UPDATE por dirty checking al hacer flush.
-        return especieMapper.toResponse(entidad);
+        // el UPDATE por dirty checking al hacer flush, que responderActualizada()
+        // adelanta.
+        return responderActualizada(entidad);
     }
 
     @Override
@@ -341,6 +350,59 @@ public class EspecieServiceImpl implements EspecieService {
         // Baja logica: varias tablas apuntan a especie por llave foranea, un
         // DELETE fisico romperia esas referencias.
         entidad.setActiva(false);
+    }
+
+    @Override
+    @Transactional
+    public EspecieResponse activar(Long id) {
+        Especie entidad = buscarOFallar(id);
+
+        // Idempotente: si ya esta activa no hay nada que cambiar, ni UPDATE
+        // pendiente, asi que no hace falta el flush de responderActualizada().
+        if (Boolean.TRUE.equals(entidad.getActiva())) {
+            return especieMapper.toResponse(entidad);
+        }
+
+        // No se toca estadoPublicacion: la ficha recupera el punto del flujo
+        // editorial en el que estaba. Si era PUBLICADA, reaparece en el
+        // catalogo publico en cuanto se confirma esta transaccion.
+        entidad.setActiva(true);
+        return responderActualizada(entidad);
+    }
+
+    /**
+     * Arma la respuesta de un metodo que modifico una especie existente,
+     * forzando antes el flush de los cambios pendientes.
+     * <p>
+     * {@code fecha_actualizacion} la escribe el trigger BEFORE UPDATE
+     * {@code trg_especie_fecha_actualizacion}, y el {@code @Generated} de la
+     * entidad solo relee ese valor despues de ejecutar el UPDATE. Sin el flush,
+     * el UPDATE ocurriria al hacer commit, cuando la respuesta ya se armo con la
+     * fecha anterior.
+     * <p>
+     * {@link #crear} no lo necesita: con IDENTITY el INSERT se ejecuta en el
+     * propio {@code save()}, y las fechas se releen en ese momento.
+     */
+    private EspecieResponse responderActualizada(Especie especie) {
+        especieRepository.flush();
+        return especieMapper.toResponse(especie);
+    }
+
+    /**
+     * Normaliza sobre el propio Request los textos que participan en
+     * comprobaciones de unicidad, para que la consulta de duplicados y el
+     * INSERT/UPDATE usen exactamente el mismo valor. Debe llamarse antes de
+     * cualquier consulta; ver {@link Textos}.
+     */
+    private void normalizar(EspecieRequest request) {
+        request.setNombreCientifico(Textos.normalizar(request.getNombreCientifico()));
+        normalizar(request.getTaxonomia());
+    }
+
+    /** Normaliza genero y especie taxonomica, que forman parte de {@code uk_taxonomia}. */
+    private void normalizar(TaxonomiaRequest clasificacion) {
+        clasificacion.setGenero(Textos.normalizar(clasificacion.getGenero()));
+        clasificacion.setEspecieTaxonomica(Textos.normalizar(clasificacion.getEspecieTaxonomica()));
     }
 
     /**

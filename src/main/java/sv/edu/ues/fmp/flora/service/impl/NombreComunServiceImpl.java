@@ -17,6 +17,7 @@ import sv.edu.ues.fmp.flora.mapper.NombreComunMapper;
 import sv.edu.ues.fmp.flora.repository.EspecieRepository;
 import sv.edu.ues.fmp.flora.repository.NombreComunRepository;
 import sv.edu.ues.fmp.flora.service.NombreComunService;
+import sv.edu.ues.fmp.flora.util.Textos;
 
 /**
  * Implementacion de la logica de negocio de los nombres comunes.
@@ -75,6 +76,10 @@ public class NombreComunServiceImpl implements NombreComunService {
     @Override
     @Transactional
     public NombreComunResponse crear(Long idEspecie, NombreComunRequest request) {
+        // Se normaliza sobre el propio Request para que la consulta de
+        // duplicados y el INSERT usen el mismo valor (ver Textos).
+        request.setNombre(Textos.normalizar(request.getNombre()));
+
         // El padre tiene que existir
         Especie especie = buscarEspecieOFallar(idEspecie);
 
@@ -104,6 +109,9 @@ public class NombreComunServiceImpl implements NombreComunService {
     @Override
     @Transactional
     public NombreComunResponse actualizar(Long id, NombreComunRequest request) {
+        // Igual que en crear(): la consulta y el UPDATE deben ver el mismo valor.
+        request.setNombre(Textos.normalizar(request.getNombre()));
+
         NombreComun entidad = buscarOFallar(id);
         Long idEspecie = entidad.getEspecie().getIdEspecie();
 
