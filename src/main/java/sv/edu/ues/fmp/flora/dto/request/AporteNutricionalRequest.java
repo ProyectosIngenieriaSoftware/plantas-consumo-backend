@@ -1,5 +1,6 @@
 package sv.edu.ues.fmp.flora.dto.request;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -24,14 +25,11 @@ public class AporteNutricionalRequest {
     @NotNull(message = "El ID del nutriente es obligatorio")
     private Long idNutriente;
 
-    @NotNull(message = "El ID de la fuente es obligatorio")
     private Long idFuente;
 
-    @NotNull(message = "La cantidad es obligatoria")
     @DecimalMin(value = "0.0", inclusive = true, message = "La cantidad debe ser 0 o mayor")
     private BigDecimal cantidad;
 
-    @NotBlank(message = "La unidad de medida es obligatoria")
     @Size(max = 30, message = "La unidad de medida no puede exceder 30 caracteres")
     private String unidadMedida;
 
@@ -39,7 +37,14 @@ public class AporteNutricionalRequest {
     @Size(max = 100, message = "La porción de referencia no puede exceder 100 caracteres")
     private String porcionReferencia;
 
-    @NotBlank(message = "La observación es obligatoria y no puede quedar vacía o con solo espacios")
     @Size(min = 4, message = "La observación debe tener al menos 4 caracteres")
     private String observacion;
+
+    @AssertTrue(message = "Si se proporciona una cantidad, la unidad de medida es obligatoria")
+    public boolean isCantidadUnidadValida() {
+        if (cantidad != null) {
+            return unidadMedida != null && !unidadMedida.trim().isEmpty();
+        }
+        return true;
+    }
 }

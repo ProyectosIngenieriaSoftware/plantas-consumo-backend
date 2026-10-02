@@ -17,9 +17,9 @@ public class AporteNutricionalMapper {
                 .nutriente(nutriente)
                 .fuente(fuente)
                 .cantidad(request.getCantidad())
-                .unidadMedida(request.getUnidadMedida().trim())
+                .unidadMedida(request.getUnidadMedida() != null && !request.getUnidadMedida().trim().isEmpty() ? request.getUnidadMedida().trim() : null)
                 .porcionReferencia(request.getPorcionReferencia().trim())
-                .observacion(request.getObservacion().trim())
+                .observacion(request.getObservacion() != null && !request.getObservacion().trim().isEmpty() ? request.getObservacion().trim() : null)
                 .build();
     }
 
@@ -28,9 +28,9 @@ public class AporteNutricionalMapper {
         entity.setNutriente(nutriente);
         entity.setFuente(fuente);
         entity.setCantidad(request.getCantidad());
-        entity.setUnidadMedida(request.getUnidadMedida().trim());
+        entity.setUnidadMedida(request.getUnidadMedida() != null && !request.getUnidadMedida().trim().isEmpty() ? request.getUnidadMedida().trim() : null);
         entity.setPorcionReferencia(request.getPorcionReferencia().trim());
-        entity.setObservacion(request.getObservacion().trim());
+        entity.setObservacion(request.getObservacion() != null && !request.getObservacion().trim().isEmpty() ? request.getObservacion().trim() : null);
     }
 
     public AporteNutricionalResponse toResponse(AporteNutricional entity) {
@@ -41,8 +41,8 @@ public class AporteNutricionalMapper {
                 .parteNombre(entity.getEspecieParteComestible().getPartePlanta().getNombre())
                 .idNutriente(entity.getNutriente().getIdNutriente())
                 .nutrienteNombre(entity.getNutriente().getNombre())
-                .idFuente(entity.getFuente().getIdFuente())
-                .fuenteTitulo(entity.getFuente().getTitulo())
+                .idFuente(entity.getFuente() != null ? entity.getFuente().getIdFuente() : null)
+                .fuenteTitulo(entity.getFuente() != null ? entity.getFuente().getTitulo() : null)
                 .cantidad(entity.getCantidad())
                 .unidadMedida(entity.getUnidadMedida())
                 .porcionReferencia(entity.getPorcionReferencia())

@@ -53,6 +53,7 @@ public class AporteNutricionalController {
         return ResponseEntity.status(HttpStatus.CREATED).body(creada);
     }
 
+
     @Operation(summary = "Actualizar un aporte nutricional existente")
     @PutMapping("/{id}")
     public ResponseEntity<AporteNutricionalResponse> actualizar(

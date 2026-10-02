@@ -4,6 +4,7 @@ import java.util.List;
 import sv.edu.ues.fmp.flora.dto.request.AporteNutricionalRequest;
 import sv.edu.ues.fmp.flora.dto.response.AporteNutricionalResponse;
 
+
 public interface AporteNutricionalService {
     List<AporteNutricionalResponse> listarPorEspecieParte(Long idEspecieParte);
     List<AporteNutricionalResponse> listarPorNutriente(Long idNutriente); // NUEVO
