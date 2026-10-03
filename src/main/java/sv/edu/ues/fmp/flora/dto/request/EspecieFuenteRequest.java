@@ -15,9 +15,6 @@ import lombok.Setter;
 @Builder
 public class EspecieFuenteRequest {
 
-    @NotNull(message = "El identificador de la especie es obligatorio")
-    private Long idEspecie;
-
     @NotNull(message = "El identificador de la fuente es obligatorio")
     private Long idFuente;
 

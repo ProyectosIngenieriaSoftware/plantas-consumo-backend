@@ -9,7 +9,7 @@ public interface EspecieFuenteService {
 
     List<EspecieFuenteResponse> listarPorEspecie(Long idEspecie);
 
-    EspecieFuenteResponse registrar(EspecieFuenteRequest request);
+    EspecieFuenteResponse registrar(Long idEspecie, EspecieFuenteRequest request);
 
     EspecieFuenteResponse actualizar(Long idEspecie, Long idFuente, EspecieFuenteRequest request);
 
