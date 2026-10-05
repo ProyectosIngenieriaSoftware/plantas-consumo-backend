@@ -1,15 +1,14 @@
 package sv.edu.ues.fmp.flora.service;
 
-import java.util.List;
-
 import sv.edu.ues.fmp.flora.dto.request.RolRequest;
+import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
 import sv.edu.ues.fmp.flora.dto.response.RolResponse;
 
 public interface RolService {
 
-    List<RolResponse> listarTodos();
+    PaginaResponse<RolResponse> listarTodos(int pagina, int tamanio);
 
-    List<RolResponse> listarActivos();
+    PaginaResponse<RolResponse> listarActivos(int pagina, int tamanio);
 
     RolResponse obtenerPorId(Long id);
 

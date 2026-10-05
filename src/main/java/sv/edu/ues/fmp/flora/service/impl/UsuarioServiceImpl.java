@@ -1,9 +1,8 @@
 package sv.edu.ues.fmp.flora.service.impl;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +12,7 @@ import sv.edu.ues.fmp.flora.dto.request.UsuarioCambioClaveRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioCreationRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioLoginRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioUpdateRequest;
+import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
 import sv.edu.ues.fmp.flora.dto.response.UsuarioResponse;
 import sv.edu.ues.fmp.flora.entity.Usuario;
 import sv.edu.ues.fmp.flora.exception.CredencialesInvalidasException;
@@ -22,6 +22,7 @@ import sv.edu.ues.fmp.flora.exception.RecursoNoEncontradoException;
 import sv.edu.ues.fmp.flora.mapper.UsuarioMapper;
 import sv.edu.ues.fmp.flora.repository.UsuarioRepository;
 import sv.edu.ues.fmp.flora.service.UsuarioService;
+import sv.edu.ues.fmp.flora.util.Paginacion;
 
 @Service
 @RequiredArgsConstructor
@@ -33,22 +34,16 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<UsuarioResponse> listarTodos() {
-        List<UsuarioResponse> respuestas = new ArrayList<>();
-        for (Usuario entidad : usuarioRepository.findAll()) {
-            respuestas.add(usuarioMapper.toResponse(entidad));
-        }
-        return respuestas;
+    public PaginaResponse<UsuarioResponse> listarTodos(int pagina, int tamanio) {
+        Pageable pageable = Paginacion.armar(pagina, tamanio, "idUsuario");
+        return Paginacion.aRespuesta(usuarioRepository.findAll(pageable), usuarioMapper::toResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<UsuarioResponse> listarActivos() {
-        List<UsuarioResponse> respuestas = new ArrayList<>();
-        for (Usuario entidad : usuarioRepository.findByActivoTrue()) {
-            respuestas.add(usuarioMapper.toResponse(entidad));
-        }
-        return respuestas;
+    public PaginaResponse<UsuarioResponse> listarActivos(int pagina, int tamanio) {
+        Pageable pageable = Paginacion.armar(pagina, tamanio, "idUsuario");
+        return Paginacion.aRespuesta(usuarioRepository.findByActivoTrue(pageable), usuarioMapper::toResponse);
     }
 
     @Override

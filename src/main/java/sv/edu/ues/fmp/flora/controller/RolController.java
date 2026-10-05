@@ -1,7 +1,5 @@
 package sv.edu.ues.fmp.flora.controller;
 
-import java.util.List;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,6 +20,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import sv.edu.ues.fmp.flora.dto.request.RolRequest;
+import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
 import sv.edu.ues.fmp.flora.dto.response.RolResponse;
 import sv.edu.ues.fmp.flora.service.RolService;
 
@@ -35,17 +34,23 @@ public class RolController {
     private final RolService rolService;
 
     @Operation(summary = "Listar roles",
-            description = "Devuelve el catálogo completo. Con soloActivos=true omite "
-                    + "los roles dados de baja lógica.")
+            description = "Devuelve el catálogo paginado. Con soloActivos=true omite "
+                    + "los roles dados de baja lógica. pagina inicia en 0; tamanio acepta "
+                    + "de 1 a 100 elementos por página.")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
+    @ApiResponse(responseCode = "400", description = "Parametro invalido")
     @GetMapping
-    public ResponseEntity<List<RolResponse>> listar(
+    public ResponseEntity<PaginaResponse<RolResponse>> listar(
             @Parameter(description = "Si es true, excluye los roles desactivados")
-            @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos) {
+            @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos,
+            @Parameter(description = "Número de página, inicia en 0")
+            @RequestParam(name = "pagina", defaultValue = "0") int pagina,
+            @Parameter(description = "Cantidad de elementos por página (máximo 100)")
+            @RequestParam(name = "tamanio", defaultValue = "10") int tamanio) {
 
-        List<RolResponse> respuesta = soloActivos
-                ? rolService.listarActivos()
-                : rolService.listarTodos();
+        PaginaResponse<RolResponse> respuesta = soloActivos
+                ? rolService.listarActivos(pagina, tamanio)
+                : rolService.listarTodos(pagina, tamanio);
 
         return ResponseEntity.ok(respuesta);
     }

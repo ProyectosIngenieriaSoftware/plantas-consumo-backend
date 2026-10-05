@@ -33,8 +33,8 @@ import tools.jackson.databind.exc.MismatchedInputException;
  * <p>
  * El manejador de {@link DataIntegrityViolationException} es una <em>red de
  * seguridad</em>, no el mecanismo previsto: cubre de golpe las restricciones de
- * todas las tablas del esquema, pero su mensaje es necesariamente generico. Si
- * un cliente recibe ese 409 generico, significa que a algun servicio le falta
+ * las 28 tablas del esquema, pero su mensaje es necesariamente generico. Si un
+ * cliente recibe ese 409 generico, significa que a algun servicio le falta
  * anticipar su propia restriccion y devolver un mensaje especifico.
  * <p>
  * El proyecto usa Jackson 3 (paquete {@code tools.jackson}) sobre Spring Boot 4:
@@ -77,7 +77,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * El registro chocaría con uno existente -> 409 CONFLICT.
+     * El registro chocaria con uno existente -> 409 CONFLICT.
      */
     @ExceptionHandler(RecursoDuplicadoException.class)
     public ResponseEntity<ErrorResponse> manejarRecursoDuplicado(
@@ -193,6 +193,48 @@ public class GlobalExceptionHandler {
                 .timestamp(LocalDateTime.now())
                 .estado(HttpStatus.BAD_REQUEST.value())
                 .error("Id inválido")
+                .mensaje(ex.getMessage())
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(cuerpo);
+    }
+
+    /**
+     * Parametro de paginacion fuera de rango -> 400 BAD REQUEST.
+     */
+    @ExceptionHandler(ParametroInvalidoException.class)
+    public ResponseEntity<ErrorResponse> manejarParametroInvalido(
+            ParametroInvalidoException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.BAD_REQUEST.value())
+                .error("Parámetro inválido")
+                .mensaje(ex.getMessage())
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(cuerpo);
+    }
+
+    /**
+     * Token de recuperacion de clave invalido, usado o expirado -> 400 BAD REQUEST.
+     */
+    @ExceptionHandler(TokenInvalidoException.class)
+    public ResponseEntity<ErrorResponse> manejarTokenInvalido(
+            TokenInvalidoException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.BAD_REQUEST.value())
+                .error("Token inválido")
                 .mensaje(ex.getMessage())
                 .ruta(request.getRequestURI())
                 .build();

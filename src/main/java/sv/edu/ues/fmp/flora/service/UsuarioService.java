@@ -1,18 +1,17 @@
 package sv.edu.ues.fmp.flora.service;
 
-import java.util.List;
-
 import sv.edu.ues.fmp.flora.dto.request.UsuarioCambioClaveRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioCreationRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioLoginRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioUpdateRequest;
+import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
 import sv.edu.ues.fmp.flora.dto.response.UsuarioResponse;
 
 public interface UsuarioService {
 
-    List<UsuarioResponse> listarTodos();
+    PaginaResponse<UsuarioResponse> listarTodos(int pagina, int tamanio);
 
-    List<UsuarioResponse> listarActivos();
+    PaginaResponse<UsuarioResponse> listarActivos(int pagina, int tamanio);
 
     UsuarioResponse obtenerPorId(Long id);
 
