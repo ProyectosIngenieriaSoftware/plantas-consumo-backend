@@ -39,18 +39,18 @@ public class AporteNutricional {
     private Nutriente nutriente;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_fuente", nullable = false)
+    @JoinColumn(name = "id_fuente")
     private Fuente fuente;
 
-    @Column(name = "cantidad", precision = 12, scale = 4, nullable = false)
+    @Column(name = "cantidad", precision = 12, scale = 4)
     private BigDecimal cantidad;
 
-    @Column(name = "unidad_medida", length = 30, nullable = false)
+    @Column(name = "unidad_medida", length = 30)
     private String unidadMedida;
 
     @Column(name = "porcion_referencia", length = 100, nullable = false)
     private String porcionReferencia;
 
-    @Column(name = "observacion", columnDefinition = "text", nullable = false)
+    @Column(name = "observacion", columnDefinition = "text")
     private String observacion;
 }

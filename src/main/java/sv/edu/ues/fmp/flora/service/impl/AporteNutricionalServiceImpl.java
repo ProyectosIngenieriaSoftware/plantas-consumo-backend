@@ -61,7 +61,11 @@ public class AporteNutricionalServiceImpl implements AporteNutricionalService {
 
         EspecieParteComestible especieParte = obtenerEspecieParteOFallar(request.getIdEspecieParte());
         Nutriente nutriente = obtenerNutrienteOFallar(request.getIdNutriente());
-        Fuente fuente = obtenerFuenteOFallar(request.getIdFuente());
+
+        Fuente fuente = null;
+        if (request.getIdFuente() != null) {
+            fuente = obtenerFuenteOFallar(request.getIdFuente());
+        }
 
         AporteNutricional nuevo = mapper.toEntity(request, especieParte, nutriente, fuente);
         return mapper.toResponse(aporteRepository.save(nuevo));
@@ -81,7 +85,11 @@ public class AporteNutricionalServiceImpl implements AporteNutricionalService {
 
         EspecieParteComestible especieParte = obtenerEspecieParteOFallar(request.getIdEspecieParte());
         Nutriente nutriente = obtenerNutrienteOFallar(request.getIdNutriente());
-        Fuente fuente = obtenerFuenteOFallar(request.getIdFuente());
+
+        Fuente fuente = null;
+        if (request.getIdFuente() != null) {
+            fuente = obtenerFuenteOFallar(request.getIdFuente());
+        }
 
         mapper.updateEntity(entidad, request, especieParte, nutriente, fuente);
         return mapper.toResponse(entidad);
@@ -108,13 +116,22 @@ public class AporteNutricionalServiceImpl implements AporteNutricionalService {
         return ep;
     }
 
+
     private Nutriente obtenerNutrienteOFallar(Long idNutriente) {
-        return nutrienteRepository.findById(idNutriente)
+        Nutriente nutriente = nutrienteRepository.findById(idNutriente)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el nutriente con id " + idNutriente));
+        if (!Boolean.TRUE.equals(nutriente.getActivo())) {
+            throw new EstadoInvalidoException("El nutriente seleccionado se encuentra desactivado.");
+        }
+        return nutriente;
     }
 
     private Fuente obtenerFuenteOFallar(Long idFuente) {
-        return fuenteRepository.findById(idFuente)
+        Fuente fuente = fuenteRepository.findById(idFuente)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la fuente con id " + idFuente));
+        if (!Boolean.TRUE.equals(fuente.getActiva())) {
+            throw new EstadoInvalidoException("La fuente seleccionada se encuentra desactivada.");
+        }
+        return fuente;
     }
 }

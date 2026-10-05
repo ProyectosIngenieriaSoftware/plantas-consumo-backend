@@ -30,3 +30,4 @@ public class AporteNutricionalResponse {
     private String porcionReferencia;
     private String observacion;
 }
+

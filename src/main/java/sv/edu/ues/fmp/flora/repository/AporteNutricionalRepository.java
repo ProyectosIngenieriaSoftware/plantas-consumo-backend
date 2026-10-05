@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
+
 public interface AporteNutricionalRepository extends JpaRepository<AporteNutricional, Long> {
 
     boolean existsByEspecieParteComestibleIdEspecieParteAndNutrienteIdNutriente(Long idEspecieParte, Long idNutriente);
@@ -15,6 +16,5 @@ public interface AporteNutricionalRepository extends JpaRepository<AporteNutrici
 
     List<AporteNutricional> findByEspecieParteComestibleIdEspecieParteOrderByIdAporteAsc(Long idEspecieParte);
 
-    // Permite al frontend buscar "qué plantas tienen Vitamina C", por ejemplo.
     List<AporteNutricional> findByNutrienteIdNutrienteOrderByIdAporteAsc(Long idNutriente);
 }
