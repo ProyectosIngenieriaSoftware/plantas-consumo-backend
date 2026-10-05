@@ -15,11 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import sv.edu.ues.fmp.flora.entity.enums.CategoriaNutriente;
 
-/**
- * Nutriente aportado por una especie. Corresponde a la tabla {@code nutriente}.
- * La columna {@code nombre} tiene restriccion UNIQUE y {@code categoria} se persiste
- * como texto (EnumType.STRING) sobre un varchar(20) protegido por CHECK constraint.
- */
+
 @Entity
 @Table(name = "nutriente")
 @Getter

@@ -19,17 +19,7 @@ import sv.edu.ues.fmp.flora.dto.request.NombreComunRequest;
 import sv.edu.ues.fmp.flora.dto.response.NombreComunResponse;
 import sv.edu.ues.fmp.flora.service.NombreComunService;
 
-/**
- * API REST de un nombre comun ya existente.
- * <p>
- * Estas rutas son planas, sin la especie: el id del nombre comun identifica el
- * recurso por si solo, asi que arrastrar el padre en la URL solo abriria la
- * puerta a peticiones incoherentes. La creacion y los listados si van anidados,
- * en {@link EspecieNombreComunController}.
- * <p>
- * Sin logica de negocio ni try/catch: las reglas viven en el servicio y los
- * errores los traduce el GlobalExceptionHandler.
- */
+
 @Tag(name = "Nombres comunes", description = "Nombres vernáculos de una especie")
 @RestController
 @RequestMapping("/api/nombres-comunes")

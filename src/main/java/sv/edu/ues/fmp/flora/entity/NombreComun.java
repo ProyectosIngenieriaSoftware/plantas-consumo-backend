@@ -15,37 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Nombre vernaculo con el que se conoce una especie en una region.
- * Corresponde a la tabla {@code nombre_comun} y depende de {@link Especie}:
- * no existe un nombre comun sin la especie a la que nombra.
- * <p>
- * La bandera de estado de esta tabla esta en <strong>masculino</strong>
- * ({@code activo}), como {@code parte_planta.activo} y a diferencia de
- * {@code especie.activa}. La baja es logica, nunca un DELETE fisico.
- * <p>
- * Restricciones que viven solo en la base y no se expresan en JPA:
- * <ul>
- *   <li>{@code uk_nombre_comun_principal}: indice unico <em>parcial</em>
- *       sobre ({@code id_especie}) WHERE {@code es_principal = true AND
- *       activo = true}. Es la regla "un solo nombre principal activo por
- *       especie" impuesta por la base. JPA no sabe declarar indices
- *       parciales, asi que aqui no se declara; el servicio la anticipa
- *       desmarcando el principal anterior dentro de la misma transaccion.</li>
- *   <li>{@code uk_nombre_comun_especie_lower}: indice unico <em>funcional</em>
- *       sobre ({@code id_especie}, {@code lower(nombre)},
- *       {@code coalesce(lower(region), '')}). JPA solo sabe declarar UNIQUE
- *       sobre las columnas tal cual, asi que aqui no se declara; la deteccion
- *       de duplicados vive en el servicio, apoyada en las consultas JPQL del
- *       repositorio que replican ese {@code lower(...)} y ese
- *       {@code coalesce(...)}. Notese que la region forma parte de la clave:
- *       el mismo nombre puede repetirse en la especie si cambia la region.</li>
- *   <li>{@code idx_nombre_comun_busqueda}: indice sobre {@code lower(nombre)}
- *       que sirve a la busqueda de especies por nombre vernaculo.</li>
- * </ul>
- * No se mapea la coleccion inversa desde {@link Especie}: los nombres se
- * recuperan por repositorio cuando hacen falta.
- */
+
 @Entity
 @Table(name = "nombre_comun")
 @Getter

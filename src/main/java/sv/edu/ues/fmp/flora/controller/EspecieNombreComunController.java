@@ -21,18 +21,7 @@ import sv.edu.ues.fmp.flora.dto.request.NombreComunRequest;
 import sv.edu.ues.fmp.flora.dto.response.NombreComunResponse;
 import sv.edu.ues.fmp.flora.service.NombreComunService;
 
-/**
- * Rutas anidadas de los nombres comunes bajo su especie.
- * <p>
- * Listar y crear siempre ocurren en el contexto de una especie, y la URL lo
- * refleja: sin ella, un POST tendria que llevar el {@code idEspecie} en el
- * cuerpo y no habria forma de leer la coleccion completa.
- * <p>
- * Va en su propia clase y no dentro de {@link EspecieController} para que el
- * modulo de nombres comunes quede completo en si mismo: el controlador de
- * especies ya carga el flujo editorial y no necesita crecer con recursos hijos.
- * Sin logica de negocio ni try/catch.
- */
+
 @Tag(name = "Nombres comunes", description = "Nombres vernáculos de una especie")
 @RestController
 @RequestMapping("/api/especies/{idEspecie}/nombres-comunes")

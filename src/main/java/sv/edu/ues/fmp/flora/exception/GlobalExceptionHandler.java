@@ -26,30 +26,7 @@ import tools.jackson.databind.exc.InvalidFormatException;
 import tools.jackson.databind.exc.InvalidNullException;
 import tools.jackson.databind.exc.MismatchedInputException;
 
-/**
- * Captura en un solo lugar las excepciones de toda la API y las convierte en
- * respuestas HTTP con un cuerpo {@link ErrorResponse} uniforme.
- * Gracias a esto los controladores quedan libres de bloques try/catch.
- * <p>
- * El manejador de {@link DataIntegrityViolationException} es una <em>red de
- * seguridad</em>, no el mecanismo previsto: cubre de golpe las restricciones de
- * las 28 tablas del esquema, pero su mensaje es necesariamente generico. Si un
- * cliente recibe ese 409 generico, significa que a algun servicio le falta
- * anticipar su propia restriccion y devolver un mensaje especifico.
- * <p>
- * El proyecto usa Jackson 3 (paquete {@code tools.jackson}) sobre Spring Boot 4:
- * las excepciones de deserializacion que se inspeccionan aqui son las de ese
- * paquete. No deben cambiarse los imports a {@code com.fasterxml.jackson}, que
- * es Jackson 2 y no interviene en la lectura de las peticiones.
- * <p>
- * El manejador de {@link Exception} al final es la ultima red de todas:
- * cualquier excepcion que no sea una de las anteriores (un bug, un
- * NullPointerException, cualquier cosa no anticipada) cae ahi en vez de
- * escapar hacia el manejo por defecto de Spring Boot, que expondria detalles
- * internos si {@code server.error.include-message} no esta en {@code never}.
- * El detalle real solo se escribe en el log del servidor; al cliente nunca
- * se le devuelve el mensaje ni la clase de la excepcion original.
- */
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

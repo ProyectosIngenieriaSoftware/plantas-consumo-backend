@@ -8,16 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Datos que entran al actualizar (PUT) una parte comestible.
- * <p>
- * Es un DTO aparte de {@link EspecieParteComestibleRequest} porque la parte
- * asociada no puede cambiarse despues de creada: preparaciones, aportes
- * nutricionales, epocas de cosecha, beneficios, imagenes y videos cuelgan de
- * este registro, y cambiar "Arilo" por "Semilla" los moveria en silencio a otra
- * parte. Si un cliente envia {@code idPartePlanta} con valor, la peticion se
- * rechaza con 400 en lugar de ignorarse, para que sepa que no se aplico.
- */
+
 @Getter
 @Setter
 @NoArgsConstructor

@@ -12,10 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Habitat donde se desarrolla una especie. Corresponde a la tabla {@code habitat}.
- * La columna {@code nombre} tiene restriccion UNIQUE y {@code descripcion} es de tipo text.
- */
+
 @Entity
 @Table(name = "habitat")
 @Getter

@@ -15,12 +15,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import sv.edu.ues.fmp.flora.entity.enums.TipoFuente;
 
-/**
- * Fuente bibliografica o de conocimiento. Corresponde a la tabla {@code fuente}.
- * La bandera de estado de esta tabla es {@code activa} (femenino), no {@code activo}.
- * La columna {@code tipo_fuente} se persiste como texto (EnumType.STRING) sobre un
- * varchar(22) protegido por CHECK constraint.
- */
 @Entity
 @Table(name = "fuente")
 @Getter

@@ -12,19 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Clasificacion taxonomica de una especie. Corresponde a la tabla {@code taxonomia}.
- * Esta tabla no tiene bandera de estado ({@code activo}/{@code activa}).
- * <p>
- * Restricciones que viven solo en la base de datos y no se expresan en JPA:
- * <ul>
- *   <li>Un CHECK constraint obliga a que {@code reino} sea 'plantae' al comparar en
- *       minusculas, por lo que el valor por defecto 'Plantae' es el unico admitido.</li>
- *   <li>Un UNIQUE NULLS NOT DISTINCT sobre
- *       ({@code reino}, {@code genero}, {@code especie_taxonomica}, {@code subespecie}),
- *       que trata los NULL como iguales entre si; JPA no puede declarar esa semantica.</li>
- * </ul>
- */
+
 @Entity
 @Table(name = "taxonomia")
 @Getter

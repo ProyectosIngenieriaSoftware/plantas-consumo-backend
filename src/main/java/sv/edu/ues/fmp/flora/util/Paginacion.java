@@ -10,15 +10,7 @@ import org.springframework.data.domain.Sort;
 import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
 import sv.edu.ues.fmp.flora.exception.ParametroInvalidoException;
 
-/**
- * Utilidad compartida por los endpoints de listado paginado.
- * <p>
- * {@link #armar} valida y construye el {@link Pageable} a partir de los
- * parametros "pagina"/"tamanio" que llegan del controlador; {@link #aRespuesta}
- * convierte el {@link Page} que devuelve el repositorio en un
- * {@link PaginaResponse}, para que ningun servicio repita esta logica ni
- * filtre el tipo Page de Spring Data hacia el cliente de la API.
- */
+
 public final class Paginacion {
 
     private static final int TAMANIO_MAXIMO = 100;

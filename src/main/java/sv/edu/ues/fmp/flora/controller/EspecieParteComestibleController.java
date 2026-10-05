@@ -19,12 +19,7 @@ import sv.edu.ues.fmp.flora.dto.request.EspecieParteComestibleActualizarRequest;
 import sv.edu.ues.fmp.flora.dto.response.EspecieParteComestibleResponse;
 import sv.edu.ues.fmp.flora.service.EspecieParteComestibleService;
 
-/**
- * API REST de una parte comestible ya existente. Rutas planas: el id del
- * registro lo identifica por si solo. La creacion y el listado van anidados
- * bajo la especie, en {@link EspecieParteComestibleAnidadoController}.
- * Sin logica de negocio ni try/catch.
- */
+
 @Tag(name = "Partes comestibles", description = "Partes comestibles de cada especie")
 @RestController
 @RequestMapping("/api/partes-comestibles")
