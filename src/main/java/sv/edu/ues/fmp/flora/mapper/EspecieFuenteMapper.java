@@ -12,9 +12,9 @@ import sv.edu.ues.fmp.flora.entity.Fuente;
 @Component
 public class EspecieFuenteMapper {
 
-    public EspecieFuente toEntity(EspecieFuenteRequest request, Especie especie, Fuente fuente) {
+    public EspecieFuente toEntity(Long idEspecie, EspecieFuenteRequest request, Especie especie, Fuente fuente) {
         return EspecieFuente.builder()
-                .id(new EspecieFuenteId(request.getIdEspecie(), request.getIdFuente()))
+                .id(new EspecieFuenteId(idEspecie, request.getIdFuente()))
                 .especie(especie)
                 .fuente(fuente)
                 .observacion(request.getObservacion())

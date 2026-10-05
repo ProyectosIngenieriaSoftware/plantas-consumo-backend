@@ -44,21 +44,29 @@ public class EspecieFuenteServiceImpl implements EspecieFuenteService {
 
     @Override
     @Transactional
-    public EspecieFuenteResponse registrar(EspecieFuenteRequest request) {
-        EspecieFuenteId id = new EspecieFuenteId(request.getIdEspecie(), request.getIdFuente());
+    public EspecieFuenteResponse registrar(Long idEspecie, EspecieFuenteRequest request) {
+        EspecieFuenteId id = new EspecieFuenteId(idEspecie, request.getIdFuente());
 
         if (especieFuenteRepository.existsById(id)) {
             throw new RecursoDuplicadoException("La fuente ya se encuentra vinculada a esta especie");
         }
 
-        Especie especie = especieRepository.findById(request.getIdEspecie())
-                .orElseThrow(() -> new RecursoNoEncontradoException("No existe una especie con id " + request.getIdEspecie()));
+        Especie especie = especieRepository.findById(idEspecie)
+                .orElseThrow(() -> new RecursoNoEncontradoException("No existe una especie con id " + idEspecie));
+
+        if (Boolean.FALSE.equals(especie.getActiva())) {
+            throw new RecursoNoEncontradoException("La especie se encuentra inactiva y no admite nuevas asociaciones");
+        }
 
         Fuente fuente = fuenteRepository.findById(request.getIdFuente())
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe una fuente con id " + request.getIdFuente()));
 
+        if (Boolean.FALSE.equals(fuente.getActiva())) {
+            throw new RecursoNoEncontradoException("La fuente se encuentra inactiva y no puede ser vinculada");
+        }
+
         normalizar(request);
-        EspecieFuente entidad = mapper.toEntity(request, especie, fuente);
+        EspecieFuente entidad = mapper.toEntity(idEspecie, request, especie, fuente);
 
         return mapper.toResponse(especieFuenteRepository.save(entidad));
     }
@@ -66,11 +74,7 @@ public class EspecieFuenteServiceImpl implements EspecieFuenteService {
     @Override
     @Transactional
     public EspecieFuenteResponse actualizar(Long idEspecie, Long idFuente, EspecieFuenteRequest request) {
-        // Validar que no intenten inyectar IDs cruzados desde la URL y el JSON
-        if (!idEspecie.equals(request.getIdEspecie()) || !idFuente.equals(request.getIdFuente())) {
-            throw new IllegalArgumentException("Los identificadores de la URL no coinciden con los del cuerpo de la petición");
-        }
-
+        // Se quitó la validación cruzada y se confía en la ruta como fuente única
         EspecieFuenteId id = new EspecieFuenteId(idEspecie, idFuente);
 
         EspecieFuente entidad = especieFuenteRepository.findById(id)
@@ -94,7 +98,7 @@ public class EspecieFuenteServiceImpl implements EspecieFuenteService {
 
     private void normalizar(EspecieFuenteRequest request) {
         if (request.getObservacion() != null) {
-            String limpio = request.getObservacion().trim().replaceAll("\\s+", " ");
+            String limpio = request.getObservacion().strip();
             request.setObservacion(limpio.isEmpty() ? null : limpio);
         }
     }

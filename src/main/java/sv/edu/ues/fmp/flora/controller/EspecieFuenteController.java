@@ -24,7 +24,7 @@ import sv.edu.ues.fmp.flora.service.EspecieFuenteService;
 
 @Tag(name = "Especies-Fuentes", description = "Gestión de las referencias bibliográficas y documentales de cada especie")
 @RestController
-@RequestMapping("/api/especies-fuentes")
+@RequestMapping("/api/especies/{idEspecie}/fuentes")
 @RequiredArgsConstructor
 public class EspecieFuenteController {
 
@@ -33,7 +33,7 @@ public class EspecieFuenteController {
     @Operation(summary = "Listar todas las fuentes vinculadas a una especie")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
     @ApiResponse(responseCode = "404", description = "No existe la especie")
-    @GetMapping("/especie/{idEspecie}")
+    @GetMapping
     public ResponseEntity<List<EspecieFuenteResponse>> listarPorEspecie(@PathVariable Long idEspecie) {
         return ResponseEntity.ok(especieFuenteService.listarPorEspecie(idEspecie));
     }
@@ -41,17 +41,19 @@ public class EspecieFuenteController {
     @Operation(summary = "Vincular una fuente a una especie")
     @ApiResponse(responseCode = "201", description = "Fuente vinculada")
     @ApiResponse(responseCode = "400", description = "Datos inválidos en el request")
-    @ApiResponse(responseCode = "404", description = "No existe la especie o la fuente indicada")
+    @ApiResponse(responseCode = "404", description = "No existe la especie o la fuente indicada, o alguna de ellas está inactiva")
     @ApiResponse(responseCode = "409", description = "La fuente ya está vinculada a esta especie")
     @PostMapping
-    public ResponseEntity<EspecieFuenteResponse> registrar(@Valid @RequestBody EspecieFuenteRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(especieFuenteService.registrar(request));
+    public ResponseEntity<EspecieFuenteResponse> registrar(
+            @PathVariable Long idEspecie,
+            @Valid @RequestBody EspecieFuenteRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(especieFuenteService.registrar(idEspecie, request));
     }
 
     @Operation(summary = "Actualizar la observación de una fuente ya vinculada")
     @ApiResponse(responseCode = "200", description = "Observación actualizada")
     @ApiResponse(responseCode = "404", description = "La relación no existe")
-    @PutMapping("/{idEspecie}/{idFuente}")
+    @PutMapping("/{idFuente}")
     public ResponseEntity<EspecieFuenteResponse> actualizar(
             @PathVariable Long idEspecie,
             @PathVariable Long idFuente,
@@ -62,7 +64,7 @@ public class EspecieFuenteController {
     @Operation(summary = "Desvincular una fuente de una especie (Eliminación física de la relación)")
     @ApiResponse(responseCode = "204", description = "Vínculo eliminado")
     @ApiResponse(responseCode = "404", description = "La relación no existe")
-    @DeleteMapping("/{idEspecie}/{idFuente}")
+    @DeleteMapping("/{idFuente}")
     public ResponseEntity<Void> eliminar(@PathVariable Long idEspecie, @PathVariable Long idFuente) {
         especieFuenteService.eliminar(idEspecie, idFuente);
         return ResponseEntity.noContent().build();
