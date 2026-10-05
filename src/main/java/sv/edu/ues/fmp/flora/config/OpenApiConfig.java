@@ -5,6 +5,8 @@ import io.swagger.v3.oas.models.info.Info;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 // http://localhost:8080/swagger-ui.html
+
+//Version 1.1 del proyecto
 @Configuration
 public class OpenApiConfig {
 
