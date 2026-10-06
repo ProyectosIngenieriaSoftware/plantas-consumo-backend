@@ -43,6 +43,8 @@ public class FuenteRequest {
 
     private String referenciaBibliografica;
 
+    @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @AssertTrue(message = "Si el tipo de fuente es SITIO_WEB, la url es obligatoria "
             + "y debe tener un formato válido (http:// o https://)")
     public boolean isUrlValidaParaSitioWeb() {
@@ -52,6 +54,8 @@ public class FuenteRequest {
         return url != null && URL_VALIDA.matcher(url.trim()).matches();
     }
 
+    @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @AssertTrue(message = "El año debe ser un valor positivo y no mayor al año actual")
     public boolean isAnioValido() {
         if (anio == null) {

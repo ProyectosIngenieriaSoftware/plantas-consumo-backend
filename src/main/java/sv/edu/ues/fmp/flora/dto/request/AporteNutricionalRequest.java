@@ -40,6 +40,8 @@ public class AporteNutricionalRequest {
     @Size(min = 4, message = "La observación debe tener al menos 4 caracteres")
     private String observacion;
 
+    @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @AssertTrue(message = "Si se proporciona una cantidad, la unidad de medida es obligatoria")
     public boolean isCantidadUnidadValida() {
         if (cantidad != null) {
