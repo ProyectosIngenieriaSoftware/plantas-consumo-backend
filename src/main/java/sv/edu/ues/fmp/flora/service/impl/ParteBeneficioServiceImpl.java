@@ -91,7 +91,7 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
 
         validarRelacionesActivas(
                 id.getIdEspecieParte(),
-                parteComestible.getActiva(),
+                parteComestible,
                 beneficio,
                 fuente
         );
@@ -138,7 +138,7 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
 
             validarRelacionesActivas(
                     idEspecieParte,
-                    parteComestible.getActiva(),
+                    parteComestible,
                     beneficio,
                     fuente
             );
@@ -162,17 +162,25 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
 
     private void validarRelacionesActivas(
             Long idEspecieParte,
-            Boolean parteActiva,
+            EspecieParteComestible parteComestible,
             Beneficio beneficio,
             Fuente fuente
     ) {
-        if (!Boolean.TRUE.equals(parteActiva)) {
+        if (!Boolean.TRUE.equals(parteComestible.getActiva())) {
             throw new EstadoInvalidoException(
                     "La parte comestible con id "
                             + idEspecieParte
                             + " está inactiva. No se puede guardar "
                             + "una asociación activa."
             );
+        }
+
+        // La parte puede seguir activa aunque su especie haya sido desactivada.
+        // Solo consultamos el estado: no propagamos cambios a otros modulos.
+        if (!Boolean.TRUE.equals(parteComestible.getEspecie().getActiva())) {
+            throw new EstadoInvalidoException(
+                    "La especie de la parte comestible con id " + idEspecieParte
+                            + " está inactiva. No se puede guardar una asociación activa.");
         }
 
         if (!Boolean.TRUE.equals(beneficio.getActivo())) {

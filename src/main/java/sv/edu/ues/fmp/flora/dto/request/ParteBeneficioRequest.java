@@ -1,5 +1,7 @@
 package sv.edu.ues.fmp.flora.dto.request;
 
+import tools.jackson.databind.annotation.JsonDeserialize;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -18,14 +20,20 @@ public class ParteBeneficioRequest {
 
     @NotNull(message = "La parte comestible es obligatoria")
     @Positive(message = "El id de la parte comestible debe ser positivo")
+    @JsonDeserialize(using = ParteBeneficioIdDeserializer.class)
+    @Schema(description = "Número entero positivo, sin comillas ni decimales.")
     private Long idEspecieParte;
 
     @NotNull(message = "El beneficio es obligatorio")
     @Positive(message = "El id del beneficio debe ser positivo")
+    @JsonDeserialize(using = ParteBeneficioIdDeserializer.class)
+    @Schema(description = "Número entero positivo, sin comillas ni decimales.")
     private Long idBeneficio;
 
     @NotNull(message = "La fuente es obligatoria")
     @Positive(message = "El id de la fuente debe ser positivo")
+    @JsonDeserialize(using = ParteBeneficioIdDeserializer.class)
+    @Schema(description = "Número entero positivo, sin comillas ni decimales.")
     private Long idFuente;
 
     @NotBlank(message = "La observación es obligatoria y no puede estar vacía")

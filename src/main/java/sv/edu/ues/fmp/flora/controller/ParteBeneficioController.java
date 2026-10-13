@@ -48,7 +48,7 @@ public class ParteBeneficioController {
     }
 
     @Operation(summary = "Crear parte beneficio",
-            description = "La parte comestible, el beneficio y la fuente deben existir y estar activos. Fuente y observación "
+            description = "La especie, su parte comestible, el beneficio y la fuente deben existir y estar activos. Los IDs del JSON deben ser enteros sin comillas ni decimales. Fuente y observación "
                     + "son obligatorias. El registro se crea activo. No se permite repetir la misma parte y beneficio, aunque el registro anterior esté inactivo.")
     @ApiResponse(responseCode = "201", description = "Parte beneficio creado")
     @ApiResponse(responseCode = "400", description = "Datos inválidos o campos obligatorios ausentes")
@@ -62,7 +62,7 @@ public class ParteBeneficioController {
     @Operation(summary = "Actualizar parte beneficio",
             description = "Permite editar la fuente, la observación y el estado. Fuente y observación son obligatorias. Los dos IDs de la URL no se modifican. "
                     + "Si omites activa o envías null, se conserva el estado actual. Para dejar el registro activo, "
-                    + "la parte comestible, el beneficio y la fuente deben estar activos. También puedes editar un registro y mantenerlo inactivo.")
+                    + "la especie, su parte comestible, el beneficio y la fuente deben estar activos. idFuente debe ser un entero sin comillas ni decimales. También puedes editar un registro y mantenerlo inactivo.")
     @ApiResponse(responseCode = "200", description = "Parte beneficio actualizado")
     @ApiResponse(responseCode = "400", description = "Datos inválidos")
     @ApiResponse(responseCode = "404", description = "No existe el registro de parte beneficio o un registro relacionado")
