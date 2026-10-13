@@ -7,10 +7,13 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -404,8 +407,58 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * La ruta existe pero no admite ese verbo (por ejemplo
+     * {@code DELETE /api/especies}, que solo esta mapeado como
+     * {@code DELETE /api/especies/{id}}) -> 405 METHOD NOT ALLOWED.
+     * <p>
+     * La respuesta lleva la cabecera {@code Allow}, que informa al cliente de
+     * que metodos si acepta esa ruta, para que pueda corregir la llamada sin
+     * consultar la documentacion. Si la excepcion no trae la lista de metodos
+     * soportados la cabecera va vacia, nunca con "null".
+     * <p>
+     * Va antes del catch-all por legibilidad, no por necesidad: Spring elige
+     * el manejador por la clase mas especifica, no por el orden en el fichero.
+     * Sin este manejador la excepcion caia en
+     * {@link #manejarExcepcionNoAnticipada} y salia como 500 "Error interno",
+     * que ademas de poco util apunta al servidor cuando el error es del
+     * cliente.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> manejarMetodoNoSoportado(
+            HttpRequestMethodNotSupportedException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.METHOD_NOT_ALLOWED.value())
+                .error("Método no permitido")
+                .mensaje("El método " + ex.getMethod() + " no está soportado en esta ruta")
+                .ruta(request.getRequestURI())
+                .build();
+
+        // HttpMethod dejo de ser enum en Spring 6, asi que el metodo de
+        // referencia es HttpMethod::name y no Enum::name.
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .header(HttpHeaders.ALLOW, String.join(", ",
+                        ex.getSupportedHttpMethods() == null
+                                ? List.<String>of()
+                                : ex.getSupportedHttpMethods().stream()
+                                        .map(HttpMethod::name)
+                                        .toList()))
+                .body(cuerpo);
+    }
+
+    /**
      * Red de seguridad final: cualquier excepcion que no coincida con ninguno
      * de los manejadores anteriores -> 500 INTERNAL SERVER ERROR.
+     * <p>
+     * Su papel es exclusivamente ese: red de ultimo recurso para errores
+     * <em>imprevistos</em>. Toda excepcion conocida debe tener su propio
+     * manejador mas arriba, con el codigo y el mensaje que le corresponden; si
+     * una excepcion previsible acaba aqui, el 500 resultante es un defecto de
+     * esta clase y no un fallo del cliente. Fue el caso de
+     * {@link HttpRequestMethodNotSupportedException}, que respondia 500 hasta
+     * que se le dio su manejador propio ({@link #manejarMetodoNoSoportado}).
      * <p>
      * Es deliberadamente inespecifica: al cliente solo se le dice que algo
      * salio mal, nunca la clase de la excepcion ni su mensaje real (podria

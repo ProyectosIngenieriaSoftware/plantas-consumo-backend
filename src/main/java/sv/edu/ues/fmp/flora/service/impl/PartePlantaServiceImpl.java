@@ -2,7 +2,6 @@ package sv.edu.ues.fmp.flora.service.impl;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,8 +19,8 @@ import sv.edu.ues.fmp.flora.util.Textos;
 
 /**
  * Implementacion de la logica de negocio de las partes de planta.
- * Aqui viven las reglas (unicidad del nombre, baja logica) y aqui termina el
- * recorrido de la entidad: hacia arriba solo salen DTOs.
+ * Aqui viven las reglas (unicidad del nombre, baja y alta logica) y aqui
+ * termina el recorrido de la entidad: hacia arriba solo salen DTOs.
  */
 @Service
 @RequiredArgsConstructor
@@ -82,10 +81,10 @@ public class PartePlantaServiceImpl implements PartePlantaService {
         // duplicados y el INSERT usen el mismo valor (ver Textos).
         request.setNombre(Textos.normalizar(request.getNombre()));
 
-        if (partePlantaRepository.existsByNombreIgnoreCase(request.getNombre())) {
-            throw new RecursoDuplicadoException(
-                    "Ya existe una parte de planta con el nombre " + request.getNombre());
-        }
+        // El nombre nunca se reutiliza, ni siquiera el de una parte
+        // desactivada: para recuperarla esta PATCH /{id}/activar.
+        partePlantaRepository.findByNombreIgnoreCase(request.getNombre())
+                .ifPresent(existente -> lanzarDuplicado(existente, true));
 
         PartePlanta nueva = partePlantaMapper.toEntity(request);
 
@@ -102,13 +101,11 @@ public class PartePlantaServiceImpl implements PartePlantaService {
 
         PartePlanta entidad = buscarOFallar(id);
 
-        Optional<PartePlanta> conMismoNombre =
-                partePlantaRepository.findByNombreIgnoreCase(request.getNombre());
-        if (conMismoNombre.isPresent()
-                && !conMismoNombre.get().getIdPartePlanta().equals(id)) {
-            throw new RecursoDuplicadoException(
-                    "Ya existe otra parte de planta con el nombre " + request.getNombre());
-        }
+        // Conservar el propio nombre no es un choque: el filter descarta la
+        // coincidencia consigo misma.
+        partePlantaRepository.findByNombreIgnoreCase(request.getNombre())
+                .filter(otra -> !otra.getIdPartePlanta().equals(id))
+                .ifPresent(otra -> lanzarDuplicado(otra, false));
 
         partePlantaMapper.updateEntity(entidad, request);
 
@@ -124,7 +121,40 @@ public class PartePlantaServiceImpl implements PartePlantaService {
 
     }
 
+    @Override
+    @Transactional
+    public PartePlantaResponse activar(Long id) {
+        PartePlanta entidad = buscarOFallar(id);
 
+        // Idempotente: activar una que ya esta activa no es un error.
+        if (!Boolean.TRUE.equals(entidad.getActivo())) {
+            entidad.setActivo(true);
+        }
+
+        return partePlantaMapper.toResponse(entidad);
+    }
+
+    /**
+     * Rechaza con 409 un nombre que ya usa otra parte de planta. El mensaje
+     * distingue si esa parte esta desactivada, porque entonces el 409 no es un
+     * callejon sin salida: el nombre se recupera reactivandola, y el mensaje
+     * dice con que ruta.
+     *
+     * @param alCrear true desde crear(), donde el mensaje añade "en lugar de
+     *                crear una nueva"; en actualizar() esa coletilla no aplica
+     */
+    private void lanzarDuplicado(PartePlanta existente, boolean alCrear) {
+        if (Boolean.TRUE.equals(existente.getActivo())) {
+            throw new RecursoDuplicadoException(
+                    "Ya existe una parte de planta con el nombre '"
+                            + existente.getNombre() + "'.");
+        }
+        throw new RecursoDuplicadoException(
+                "Ya existe la parte de planta '" + existente.getNombre()
+                        + "', pero está desactivada. Actívela con "
+                        + "PATCH /api/partes-planta/" + existente.getIdPartePlanta()
+                        + "/activar" + (alCrear ? " en lugar de crear una nueva." : "."));
+    }
 
     private PartePlanta buscarOFallar(Long id) {
         return partePlantaRepository.findById(id)

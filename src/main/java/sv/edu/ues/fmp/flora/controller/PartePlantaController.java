@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -82,10 +83,15 @@ public class PartePlantaController {
     }
 
     @Operation(summary = "Crear una parte de planta",
-            description = "El nombre es único en todo el catálogo, sin distinguir mayúsculas.")
+            description = "El nombre es único en todo el catálogo, sin distinguir mayúsculas. "
+                    + "No se reutiliza el nombre de una parte desactivada: para recuperarla "
+                    + "está PATCH /api/partes-planta/{id}/activar.")
     @ApiResponse(responseCode = "201", description = "Parte creada")
     @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
-    @ApiResponse(responseCode = "409", description = "Ya existe una parte con ese nombre")
+    @ApiResponse(responseCode = "409",
+            description = "Ya existe una parte con ese nombre. Si está activa, el mensaje lo "
+                    + "indica sin más; si está desactivada, el mensaje incluye su id y la ruta "
+                    + "PATCH para activarla en lugar de crear una nueva.")
     @PostMapping
     public ResponseEntity<PartePlantaResponse> crear(
             @Valid @RequestBody PartePlantaRequest request) {
@@ -95,11 +101,17 @@ public class PartePlantaController {
     }
 
     @Operation(summary = "Actualizar una parte de planta",
-            description = "No cambia la bandera de estado: para dar de baja está el DELETE.")
+            description = "No cambia la bandera de estado: para dar de baja está el DELETE y "
+                    + "para recuperar, PATCH /{id}/activar. Conservar el nombre actual es "
+                    + "válido.")
     @ApiResponse(responseCode = "200", description = "Parte actualizada")
     @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
     @ApiResponse(responseCode = "404", description = "No existe una parte con ese id")
-    @ApiResponse(responseCode = "409", description = "Ya existe otra parte con ese nombre")
+    @ApiResponse(responseCode = "409",
+            description = "Otra parte ya usa ese nombre. Si está activa: \"Ya existe una parte "
+                    + "de planta con el nombre 'X'.\" Si está desactivada: \"Ya existe la parte "
+                    + "de planta 'X', pero está desactivada. Actívela con PATCH "
+                    + "/api/partes-planta/{id}/activar.\"")
     @PutMapping("/{id}")
     public ResponseEntity<PartePlantaResponse> actualizar(
             @PathVariable Long id,
@@ -110,12 +122,24 @@ public class PartePlantaController {
 
     @Operation(summary = "Dar de baja lógica una parte de planta",
             description = "No borra la fila: la tabla especie_parte_comestible la referencia "
-                    + "por llave foránea y un DELETE físico rompería esas referencias.")
+                    + "por llave foránea y un DELETE físico rompería esas referencias. "
+                    + "Se recupera con PATCH /{id}/activar; su nombre sigue ocupado mientras "
+                    + "esté desactivada, así que no se puede volver a crear.")
     @ApiResponse(responseCode = "204", description = "Parte desactivada")
     @ApiResponse(responseCode = "404", description = "No existe una parte con ese id")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> desactivar(@PathVariable Long id) {
         partePlantaService.desactivar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Reactivar una parte de planta desactivada",
+            description = "Idempotente: si la parte ya está activa, no hace nada.")
+    @ApiResponse(responseCode = "200", description = "Parte activada o ya estaba activa")
+    @ApiResponse(responseCode = "400", description = "El id no es un número válido")
+    @ApiResponse(responseCode = "404", description = "No existe una parte con ese id")
+    @PatchMapping("/{id}/activar")
+    public ResponseEntity<PartePlantaResponse> activar(@PathVariable Long id) {
+        return ResponseEntity.ok(partePlantaService.activar(id));
     }
 }

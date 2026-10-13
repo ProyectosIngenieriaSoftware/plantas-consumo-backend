@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import sv.edu.ues.fmp.flora.dto.response.PartePlantaResponse;
 import sv.edu.ues.fmp.flora.entity.PartePlanta;
 
 
@@ -23,10 +22,10 @@ public interface PartePlantaRepository extends JpaRepository<PartePlanta, Long> 
     //count
     //existById
 
-    // Comprueba si ya hay una parte con ese nombre, sin distinguir mayúsculas
-    boolean existsByNombreIgnoreCase(String nombre);
-
-    // Recupera la parte con ese nombre para poder comparar su id al actualizar
+    // Recupera la parte con ese nombre, sin distinguir mayúsculas. Sirve para
+    // los dos casos: detectar el duplicado al crear y comparar su id al
+    // actualizar. Devuelve la entidad y no un boolean porque el mensaje del
+    // 409 necesita saber si esa parte está activa o desactivada.
     Optional<PartePlanta> findByNombreIgnoreCase(String nombre);
 
     //** Solo las partes vigentes, es decir las que no han sido dadas de baja logica
@@ -52,6 +51,7 @@ public interface PartePlantaRepository extends JpaRepository<PartePlanta, Long> 
 
     //Cuando la consulta no cabe en un nombre. Sigue siendo la interfaz, no hace falta ninguna clase de impl
 
+    // Ejemplo didactico de @Query para el equipo: sin llamadores a proposito, no borrar.
     @Query("SELECT p FROM PartePlanta p WHERE p.activo = true AND LENGTH(p.nombre) > :min")
     List<PartePlanta> buscarActivasConNombreLargo(@Param("min") int min);
 

@@ -41,7 +41,17 @@ public interface EspecieService {
 
     EspecieResponse enviarARevision(Long id);
 
-    /** Marca la ficha como revisada sin publicarla todavia. */
+    /**
+     * Marca la ficha como revisada sin publicarla todavia: el estado sigue
+     * siendo EN_REVISION.
+     * <p>
+     * Se valida una sola vez. Una ficha que ya tiene validador no se puede
+     * revalidar, aunque siga EN_REVISION: esa regla cierra la ventana en la
+     * que dos validadores podian sobrescribirse mutuamente y dejar la ficha
+     * atribuida a quien llamara de ultimo. Para cambiar de validador hay que
+     * rechazar la ficha primero, que es la unica transicion que limpia
+     * {@code validadaPor}, y volver a enviarla a revision.
+     */
     EspecieResponse validar(Long id, Long idValidador);
 
     EspecieResponse publicar(Long id, Long idPublicador);

@@ -65,7 +65,12 @@ public class EspecieController {
         return ResponseEntity.ok(especieService.obtenerPorId(id));
     }
 
-    @Operation(summary = "Crear una especie junto con su taxonomía")
+    @Operation(summary = "Crear una especie junto con su taxonomía",
+            description = "El estado inicial siempre es BORRADOR. Cualquier campo "
+                    + "estadoPublicacion, activa, validadaPor, publicadaPor o fechas "
+                    + "enviados en el cuerpo son ignorados silenciosamente; el flujo "
+                    + "editorial se gestiona con los endpoints PATCH dedicados "
+                    + "(enviar-revision, validar, publicar, rechazar).")
     @PostMapping
     public ResponseEntity<EspecieResponse> crear(@Valid @RequestBody EspecieRequest request) {
         EspecieResponse creada = especieService.crear(request);

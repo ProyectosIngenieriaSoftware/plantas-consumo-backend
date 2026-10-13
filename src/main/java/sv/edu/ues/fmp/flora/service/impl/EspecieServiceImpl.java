@@ -246,6 +246,20 @@ public class EspecieServiceImpl implements EspecieService {
                             + " está en " + entidad.getEstadoPublicacion());
         }
 
+        // El estado por si solo no basta como guarda: una especie ya validada
+        // sigue EN_REVISION hasta que se publique o se rechace, asi que sin
+        // esta comprobacion un segundo validador sobrescribiria al primero y
+        // la ficha quedaria atribuida a quien llamo de ultimo. Rechazar es la
+        // unica via que limpia validadaPor, y por eso es la que indica el
+        // mensaje.
+        if (entidad.getValidadaPor() != null) {
+            throw new EstadoInvalidoException(
+                    "La especie " + id + " ya fue validada por "
+                            + entidad.getValidadaPor().getNombreUsuario()
+                            + " el " + entidad.getFechaValidacion()
+                            + ". Para asignar un nuevo validador, rechácela primero.");
+        }
+
         Usuario validador = buscarUsuarioOFallar(idValidador, "validador");
 
         // El CHECK ck_especie_validacion exige que validada_por y

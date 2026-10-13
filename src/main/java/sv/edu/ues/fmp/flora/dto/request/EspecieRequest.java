@@ -3,6 +3,7 @@ package sv.edu.ues.fmp.flora.dto.request;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -43,8 +44,16 @@ public class EspecieRequest {
 
     private String advertencias;
 
+    /**
+     * El {@code @Positive} descarta aqui los ids imposibles (0 y negativos),
+     * que antes pasaban el DTO y terminaban en un 404 del servicio al no
+     * encontrar el usuario: un id negativo es un cuerpo mal formado, 400, no
+     * un usuario inexistente. El 404 se reserva para ids positivos que
+     * simplemente no estan en la tabla.
+     */
     // TODO: eliminar cuando se implemente JWT; se tomará del token del usuario autenticado
     @NotNull(message = "El usuario creador es obligatorio")
+    @Positive(message = "El identificador del usuario creador debe ser positivo")
     private Long creadaPor;
 
     /**

@@ -32,6 +32,15 @@ public interface PartePlantaService {
 
     void desactivar(Long id);
 
+    /**
+     * Revierte la baja logica. Idempotente: sobre una parte que ya esta activa
+     * no cambia nada y devuelve su estado igualmente.
+     * <p>
+     * Es la unica via para recuperar una parte desactivada, porque su nombre
+     * sigue ocupando el UNIQUE de la tabla y no se puede volver a crear.
+     */
+    PartePlantaResponse activar(Long id);
+
 
 
 }
