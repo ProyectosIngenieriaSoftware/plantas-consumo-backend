@@ -10,9 +10,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -35,20 +37,34 @@ public class UsuarioRolController {
     @Operation(summary = "Listar los roles de un usuario",
             description = "Devuelve los roles asignados al usuario indicado a través de "
                     + "usuario_rol. Un usuario sin roles asignados devuelve una lista vacía, "
-                    + "no un error.")
+                    + "no un error. Por omisión la lista es el histórico completo: incluye "
+                    + "los roles desactivados, porque la fila de usuario_rol sobrevive a la "
+                    + "baja lógica del rol y sirve para auditar qué se le asignó alguna vez. "
+                    + "Con soloActivos=true devuelve únicamente los roles vigentes. Para "
+                    + "saber qué puede hacer el usuario de verdad, use "
+                    + "/usuario/{idUsuario}/permisos, que ya descarta los roles de baja.")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
     @ApiResponse(responseCode = "400", description = "El id del usuario no es un valor positivo")
     @ApiResponse(responseCode = "404", description = "No existe un usuario con ese id")
     @GetMapping("/usuario/{idUsuario}")
-    public ResponseEntity<List<RolResponse>> obtenerRolesDeUsuario(@PathVariable Long idUsuario) {
-        return ResponseEntity.ok(usuarioRolService.obtenerRolesDeUsuario(idUsuario));
+    public ResponseEntity<List<RolResponse>> obtenerRolesDeUsuario(
+            @PathVariable Long idUsuario,
+            @Parameter(description = "Si es true, excluye los roles desactivados")
+            @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos) {
+
+        return ResponseEntity.ok(usuarioRolService.obtenerRolesDeUsuario(idUsuario, soloActivos));
     }
 
     @Operation(summary = "Listar los permisos efectivos de un usuario",
             description = "Recorre usuario -> usuario_rol -> rol -> rol_permiso -> permiso y "
                     + "devuelve la lista de permisos ya aplanada y sin duplicados, aunque el "
                     + "usuario tenga varios roles que compartan un mismo permiso. Es el dato "
-                    + "pensado para construir las autoridades de un usuario autenticado.")
+                    + "pensado para construir las autoridades de un usuario autenticado. "
+                    + "Solo incluye lo efectivamente otorgado: se descartan los roles "
+                    + "desactivados y los permisos desactivados, porque dar de baja un rol "
+                    + "es la forma de revocar lo que concedía. Por eso esta lista puede ser "
+                    + "más corta que la suma de los permisos de los roles que devuelve "
+                    + "/usuario/{idUsuario}, que incluye el histórico.")
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
     @ApiResponse(responseCode = "400", description = "El id del usuario no es un valor positivo")
     @ApiResponse(responseCode = "404", description = "No existe un usuario con ese id")

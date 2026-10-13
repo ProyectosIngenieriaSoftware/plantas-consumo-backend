@@ -42,13 +42,21 @@ public class UsuarioRolServiceImpl implements UsuarioRolService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RolResponse> obtenerRolesDeUsuario(Long idUsuario) {
+    public List<RolResponse> obtenerRolesDeUsuario(Long idUsuario, boolean soloActivos) {
         validarId(idUsuario, "usuario");
         if (!usuarioRepository.existsById(idUsuario)) {
             throw new RecursoNoEncontradoException("No existe un usuario con id " + idUsuario);
         }
 
-        return usuarioRolMapper.toRolResponseList(usuarioRolRepository.findRolesByUsuarioId(idUsuario));
+        List<Rol> roles = usuarioRolRepository.findRolesByUsuarioId(idUsuario);
+
+        if (soloActivos) {
+            roles = roles.stream()
+                    .filter(rol -> Boolean.TRUE.equals(rol.getActivo()))
+                    .toList();
+        }
+
+        return usuarioRolMapper.toRolResponseList(roles);
     }
 
     @Override
@@ -63,7 +71,21 @@ public class UsuarioRolServiceImpl implements UsuarioRolService {
 
         Map<Long, Permiso> permisosPorId = new LinkedHashMap<>();
         for (Rol rol : roles) {
+            // Un rol desactivado no otorga permisos: desactivarlo es
+            // precisamente la forma de revocar lo que concedia. Sin este
+            // filtro, dar de baja un rol no quitaba nada a quien ya lo tenia
+            // asignado, porque la fila de usuario_rol sigue existiendo.
+            if (!Boolean.TRUE.equals(rol.getActivo())) {
+                continue;
+            }
+
             for (Permiso permiso : rolPermisoRepository.findPermisosByRolId(rol.getIdRol())) {
+                // Mismo criterio para el permiso en si: uno dado de baja no se
+                // ejerce aunque lo conceda un rol activo.
+                if (!Boolean.TRUE.equals(permiso.getActivo())) {
+                    continue;
+                }
+
                 permisosPorId.putIfAbsent(permiso.getIdPermiso(), permiso);
             }
         }
