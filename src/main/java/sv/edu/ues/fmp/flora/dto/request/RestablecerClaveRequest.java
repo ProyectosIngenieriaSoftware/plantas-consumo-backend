@@ -9,10 +9,19 @@ public record RestablecerClaveRequest(
         String token,
 
         @NotBlank(message = "La clave nueva es obligatoria")
+        // El maximo de 72 lo impone BCrypt, que trunca a 72 bytes: permitir mas
+        // seria aceptar en silencio una clave cuyo final no se comprueba.
         @Size(min = 8, max = 72, message = "La clave debe tener entre 8 y 72 caracteres")
+        // Misma politica que al crear el usuario (ver UsuarioCreationRequest):
+        // (?=.*[A-Z]) una mayuscula, (?=.*\d) un digito y (?=.*[^A-Za-z0-9])
+        // un caracter que no sea letra ni numero. El .+ acepta el resto; la
+        // longitud la impone el @Size. No se exige minuscula a proposito.
+        // Tiene que coincidir con los otros dos DTOs de clave: si aqui fuera
+        // mas estricta, quien olvidara su clave no podria restablecerla con la
+        // misma que si le acepto el registro.
         @Pattern(
-                regexp = "^(?=(?:.*[A-Z]){3,})(?=(?:.*[a-z]){2,})(?=(?:.*[0-9]){2,}).+$",
-                message = "La clave debe tener al menos 3 mayúsculas, 2 minúsculas y 2 números")
+                regexp = "^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).+$",
+                message = "La clave debe tener al menos una mayúscula, un número y un carácter especial")
         String claveNueva
 ) {
 }

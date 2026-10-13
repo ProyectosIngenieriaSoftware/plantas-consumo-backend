@@ -27,10 +27,18 @@ public record UsuarioCreationRequest(
         String nombreUsuario,
 
         @NotBlank(message = "La clave es obligatoria")
+        // El maximo de 72 lo impone BCrypt, que trunca a 72 bytes: permitir mas
+        // seria aceptar en silencio una clave cuyo final no se comprueba.
         @Size(min = 8, max = 72, message = "La clave debe tener entre 8 y 72 caracteres")
+        // Tres miradas al frente, cada una sobre la clave completa:
+        // (?=.*[A-Z]) una mayuscula, (?=.*\d) un digito y (?=.*[^A-Za-z0-9])
+        // un caracter que no sea letra ni numero (!@#$%&*, acentos, ñ…).
+        // El .+ final acepta el resto; la longitud la impone el @Size de arriba.
+        // No se exige minuscula a proposito: la politica acordada no la pide,
+        // asi que "MIAVE2026!" es valida.
         @Pattern(
-                regexp = "^(?=(?:.*[A-Z]){3,})(?=(?:.*[a-z]){2,})(?=(?:.*[0-9]){2,}).+$",
-                message = "La clave debe tener al menos 3 mayúsculas, 2 minúsculas y 2 números")
+                regexp = "^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).+$",
+                message = "La clave debe tener al menos una mayúscula, un número y un carácter especial")
         String clave
 ) {
     public UsuarioCreationRequest {
