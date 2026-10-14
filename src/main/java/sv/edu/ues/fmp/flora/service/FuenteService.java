@@ -20,4 +20,6 @@ public interface FuenteService {
 
     void desactivar(Long id);
 
+    FuenteResponse activar(Long id);
+
 }

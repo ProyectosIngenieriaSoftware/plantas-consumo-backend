@@ -97,6 +97,19 @@ public class FuenteServiceImpl implements FuenteService {
 
     }
 
+    @Override
+    @Transactional
+    public FuenteResponse activar(Long id) {
+        Fuente entidad = buscarOFallar(id);
+
+        if (Boolean.TRUE.equals(entidad.getActiva())) {
+            return fuenteMapper.toResponse(entidad);
+        }
+
+        entidad.setActiva(true);
+        return fuenteMapper.toResponse(entidad);
+    }
+
     private Fuente buscarOFallar(Long id) {
         return fuenteRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException(

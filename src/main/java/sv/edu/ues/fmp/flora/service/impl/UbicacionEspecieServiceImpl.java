@@ -1,15 +1,16 @@
 package sv.edu.ues.fmp.flora.service.impl;
 
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import sv.edu.ues.fmp.flora.dto.request.UbicacionEspecieRequestDTO;
-import sv.edu.ues.fmp.flora.dto.response.UbicacionEspecieResponseDTO;
+import sv.edu.ues.fmp.flora.dto.request.UbicacionEspecieRequest;
+import sv.edu.ues.fmp.flora.dto.response.UbicacionEspecieResponse;
 import sv.edu.ues.fmp.flora.entity.Distrito;
 import sv.edu.ues.fmp.flora.entity.Especie;
 import sv.edu.ues.fmp.flora.entity.UbicacionEspecie;
+import sv.edu.ues.fmp.flora.exception.EstadoInvalidoException;
+import sv.edu.ues.fmp.flora.exception.RecursoNoEncontradoException;
 import sv.edu.ues.fmp.flora.repository.DistritoRepository;
 import sv.edu.ues.fmp.flora.repository.EspecieRepository;
 import sv.edu.ues.fmp.flora.repository.UbicacionEspecieRepository;
@@ -27,21 +28,30 @@ public class UbicacionEspecieServiceImpl implements UbicacionEspecieService {
 
     @Override
     @Transactional
-    public UbicacionEspecieResponseDTO registrarUbicacion(UbicacionEspecieRequestDTO dto) {
-        Especie especie = especieRepository.findById(dto.getIdEspecie())
-                .orElseThrow(() -> new EntityNotFoundException("Especie no encontrada"));
+    public UbicacionEspecieResponse crear(UbicacionEspecieRequest request) {
+        Especie especie = especieRepository.findById(request.getIdEspecie())
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "No existe una especie con id " + request.getIdEspecie()));
 
-        Distrito distrito = distritoRepository.findById(dto.getIdDistrito())
-                .orElseThrow(() -> new EntityNotFoundException("Distrito no encontrado"));
+        if (!Boolean.TRUE.equals(especie.getActiva())) {
+            throw new EstadoInvalidoException(
+                    "No se pueden registrar ubicaciones para una especie desactivada.");
+        }
 
-        UbicacionEspecie ubicacion = new UbicacionEspecie();
-        ubicacion.setEspecie(especie);
-        ubicacion.setDistrito(distrito);
-        ubicacion.setNombreLugar(dto.getNombreLugar());
-        ubicacion.setLatitud(dto.getLatitud());
-        ubicacion.setLongitud(dto.getLongitud());
-        ubicacion.setDescripcion(dto.getDescripcion());
-        ubicacion.setFechaObservacion(dto.getFechaObservacion());
+        Distrito distrito = distritoRepository.findById(request.getIdDistrito())
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "No existe un distrito con id " + request.getIdDistrito()));
+
+        UbicacionEspecie ubicacion = UbicacionEspecie.builder()
+                .especie(especie)
+                .distrito(distrito)
+                .nombreLugar(limpiarEspacios(request.getNombreLugar()))
+                .latitud(request.getLatitud())
+                .longitud(request.getLongitud())
+                .descripcion(limpiarEspacios(request.getDescripcion()))
+                .fechaObservacion(request.getFechaObservacion())
+                .activa(true)
+                .build();
 
         UbicacionEspecie guardada = ubicacionEspecieRepository.save(ubicacion);
 
@@ -49,7 +59,12 @@ public class UbicacionEspecieServiceImpl implements UbicacionEspecieService {
     }
 
     @Override
-    public List<UbicacionEspecieResponseDTO> obtenerUbicacionesPorEspecie(Long idEspecie) {
+    @Transactional(readOnly = true)
+    public List<UbicacionEspecieResponse> obtenerUbicacionesPorEspecie(Long idEspecie) {
+        if (!especieRepository.existsById(idEspecie)) {
+            throw new RecursoNoEncontradoException("No existe una especie con id " + idEspecie);
+        }
+
         return ubicacionEspecieRepository.findByEspecie_IdEspecieAndActivaTrue(idEspecie)
                 .stream()
                 .map(this::mapearAResponse)
@@ -58,23 +73,31 @@ public class UbicacionEspecieServiceImpl implements UbicacionEspecieService {
 
     @Override
     @Transactional
-    public UbicacionEspecieResponseDTO actualizarUbicacion(Long idUbicacion, UbicacionEspecieRequestDTO dto) {
+    public UbicacionEspecieResponse actualizarUbicacion(Long idUbicacion, UbicacionEspecieRequest request) {
         UbicacionEspecie ubicacion = ubicacionEspecieRepository.findById(idUbicacion)
-                .orElseThrow(() -> new EntityNotFoundException("Ubicación no encontrada con ID: " + idUbicacion));
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "No existe una ubicación con id " + idUbicacion));
 
-        Especie especie = especieRepository.findById(dto.getIdEspecie())
-                .orElseThrow(() -> new EntityNotFoundException("Especie no encontrada"));
+        Especie especie = especieRepository.findById(request.getIdEspecie())
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "No existe una especie con id " + request.getIdEspecie()));
 
-        Distrito distrito = distritoRepository.findById(dto.getIdDistrito())
-                .orElseThrow(() -> new EntityNotFoundException("Distrito no encontrado"));
+        if (!Boolean.TRUE.equals(especie.getActiva())) {
+            throw new EstadoInvalidoException(
+                    "No se pueden registrar ubicaciones para una especie desactivada.");
+        }
+
+        Distrito distrito = distritoRepository.findById(request.getIdDistrito())
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "No existe un distrito con id " + request.getIdDistrito()));
 
         ubicacion.setEspecie(especie);
         ubicacion.setDistrito(distrito);
-        ubicacion.setNombreLugar(dto.getNombreLugar());
-        ubicacion.setLatitud(dto.getLatitud());
-        ubicacion.setLongitud(dto.getLongitud());
-        ubicacion.setDescripcion(dto.getDescripcion());
-        ubicacion.setFechaObservacion(dto.getFechaObservacion());
+        ubicacion.setNombreLugar(limpiarEspacios(request.getNombreLugar()));
+        ubicacion.setLatitud(request.getLatitud());
+        ubicacion.setLongitud(request.getLongitud());
+        ubicacion.setDescripcion(limpiarEspacios(request.getDescripcion()));
+        ubicacion.setFechaObservacion(request.getFechaObservacion());
 
         UbicacionEspecie actualizada = ubicacionEspecieRepository.save(ubicacion);
         return mapearAResponse(actualizada);
@@ -84,27 +107,33 @@ public class UbicacionEspecieServiceImpl implements UbicacionEspecieService {
     @Transactional
     public void desactivarUbicacion(Long idUbicacion) {
         UbicacionEspecie ubicacion = ubicacionEspecieRepository.findById(idUbicacion)
-                .orElseThrow(() -> new EntityNotFoundException("Ubicación no encontrada con ID: " + idUbicacion));
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "No existe una ubicación con id " + idUbicacion));
 
         ubicacion.setActiva(false);
-        ubicacionEspecieRepository.save(ubicacion);
     }
 
-    private UbicacionEspecieResponseDTO mapearAResponse(UbicacionEspecie entidad) {
-        UbicacionEspecieResponseDTO response = new UbicacionEspecieResponseDTO();
-        response.setIdUbicacion(entidad.getIdUbicacion());
+    private UbicacionEspecieResponse mapearAResponse(UbicacionEspecie entidad) {
+        return UbicacionEspecieResponse.builder()
+                .idUbicacion(entidad.getIdUbicacion())
+                .idEspecie(entidad.getEspecie().getIdEspecie())
+                .idDistrito(entidad.getDistrito().getIdDistrito())
+                .nombreDistrito(entidad.getDistrito().getNombre())
+                .nombreLugar(entidad.getNombreLugar())
+                .latitud(entidad.getLatitud())
+                .longitud(entidad.getLongitud())
+                .descripcion(entidad.getDescripcion())
+                .fechaObservacion(entidad.getFechaObservacion())
+                .activa(entidad.getActiva())
+                .fechaRegistro(entidad.getFechaRegistro())
+                .build();
+    }
 
-        response.setIdEspecie(entidad.getEspecie().getIdEspecie());
-        response.setIdDistrito(entidad.getDistrito().getIdDistrito());
-
-        response.setNombreDistrito(entidad.getDistrito().getNombre());
-        response.setNombreLugar(entidad.getNombreLugar());
-        response.setLatitud(entidad.getLatitud());
-        response.setLongitud(entidad.getLongitud());
-        response.setDescripcion(entidad.getDescripcion());
-        response.setFechaObservacion(entidad.getFechaObservacion());
-        response.setActiva(entidad.getActiva());
-        response.setFechaRegistro(entidad.getFechaRegistro());
-        return response;
+    private String limpiarEspacios(String valor) {
+        if (valor == null) {
+            return null;
+        }
+        String limpio = valor.trim().replaceAll("\\s+", " ");
+        return limpio.isEmpty() ? null : limpio;
     }
 }

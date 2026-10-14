@@ -1,28 +1,38 @@
 package sv.edu.ues.fmp.flora.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "distrito")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Distrito {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_distrito")
+    @Column(name = "id_distrito", nullable = false, updatable = false)
     private Long idDistrito;
 
-    @Column(name = "id_municipio")
+    @Column(name = "id_municipio", nullable = false)
     private Long idMunicipio;
 
-    @Column(name = "nombre", length = 150)
+    @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
 
-    @Column(name = "activo")
-    private Boolean activo;
+    @Builder.Default
+    @Column(name = "activo", nullable = false)
+    private Boolean activo = true;
 }
