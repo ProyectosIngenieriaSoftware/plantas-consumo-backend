@@ -1,17 +1,17 @@
 package sv.edu.ues.fmp.flora.service;
 
-import sv.edu.ues.fmp.flora.dto.request.UbicacionEspecieRequestDTO;
-import sv.edu.ues.fmp.flora.dto.response.UbicacionEspecieResponseDTO;
+import sv.edu.ues.fmp.flora.dto.request.UbicacionEspecieRequest;
+import sv.edu.ues.fmp.flora.dto.response.UbicacionEspecieResponse;
 
 import java.util.List;
 
 public interface UbicacionEspecieService {
 
-    UbicacionEspecieResponseDTO registrarUbicacion(UbicacionEspecieRequestDTO dto);
+    UbicacionEspecieResponse crear(UbicacionEspecieRequest request);
 
-    List<UbicacionEspecieResponseDTO> obtenerUbicacionesPorEspecie(Long idEspecie);
+    List<UbicacionEspecieResponse> obtenerUbicacionesPorEspecie(Long idEspecie);
 
-    UbicacionEspecieResponseDTO actualizarUbicacion(Long idUbicacion, UbicacionEspecieRequestDTO dto);
+    UbicacionEspecieResponse actualizarUbicacion(Long idUbicacion, UbicacionEspecieRequest request);
 
     void desactivarUbicacion(Long idUbicacion);
 }

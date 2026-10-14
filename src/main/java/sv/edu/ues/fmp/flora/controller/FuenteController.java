@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -79,12 +80,26 @@ public class FuenteController {
         return ResponseEntity.ok(fuenteService.actualizar(id, request));
     }
 
-    @Operation(summary = "Dar de baja lógica una fuente")
+    @Operation(summary = "Dar de baja lógica una fuente",
+            description = "No borra la fila: marca la fuente como inactiva. Puede reactivarse con "
+                    + "PATCH /api/fuentes/{id}/activar.")
     @ApiResponse(responseCode = "204", description = "Fuente desactivada")
+    @ApiResponse(responseCode = "400", description = "El id no tiene formato numérico")
     @ApiResponse(responseCode = "404", description = "No existe una fuente con ese id")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> desactivar(@PathVariable Long id) {
         fuenteService.desactivar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Reactivar una fuente desactivada",
+            description = "Revierte la baja lógica. Es idempotente: sobre una fuente que ya "
+                    + "está activa no cambia nada y devuelve 200 igualmente.")
+    @ApiResponse(responseCode = "200", description = "Fuente activa")
+    @ApiResponse(responseCode = "400", description = "El id no tiene formato numérico")
+    @ApiResponse(responseCode = "404", description = "No existe una fuente con ese id")
+    @PatchMapping("/{id}/activar")
+    public ResponseEntity<FuenteResponse> activar(@PathVariable Long id) {
+        return ResponseEntity.ok(fuenteService.activar(id));
     }
 }
