@@ -24,6 +24,7 @@ import sv.edu.ues.fmp.flora.dto.response.NutrienteResponse;
 import sv.edu.ues.fmp.flora.entity.enums.CategoriaNutriente;
 import sv.edu.ues.fmp.flora.exception.IdInvalidoException;
 import sv.edu.ues.fmp.flora.service.NutrienteService;
+import org.springframework.web.bind.annotation.PatchMapping;
 
 @RestController
 @RequestMapping("/api/nutrientes")
@@ -93,5 +94,11 @@ public class NutrienteController {
     public ResponseEntity<List<NutrienteResponse>> buscarPorCategoria(
             @PathVariable CategoriaNutriente categoria) {
         return ResponseEntity.ok(nutrienteService.buscarPorCategoria(categoria));
+    }
+    @Operation(summary = "Reactivar un nutriente dado de baja",
+            description = "Vuelve a activar un nutriente desactivado. Si ya estaba activo, no hace cambios.")
+    @PatchMapping("/{id}/activar")
+    public ResponseEntity<NutrienteResponse> activar(@PathVariable Long id) {
+        return ResponseEntity.ok(nutrienteService.activar(id));
     }
 }
