@@ -1,5 +1,6 @@
 package sv.edu.ues.fmp.flora.mapper;
 
+import java.math.RoundingMode;
 import org.springframework.stereotype.Component;
 import sv.edu.ues.fmp.flora.dto.request.AporteNutricionalRequest;
 import sv.edu.ues.fmp.flora.dto.response.AporteNutricionalResponse;
@@ -16,7 +17,7 @@ public class AporteNutricionalMapper {
                 .especieParteComestible(especieParte)
                 .nutriente(nutriente)
                 .fuente(fuente)
-                .cantidad(request.getCantidad())
+                .cantidad(request.getCantidad() != null ? request.getCantidad().setScale(4, RoundingMode.HALF_UP) : null)
                 .unidadMedida(request.getUnidadMedida() != null && !request.getUnidadMedida().trim().isEmpty() ? request.getUnidadMedida().trim() : null)
                 .porcionReferencia(request.getPorcionReferencia().trim())
                 .observacion(request.getObservacion() != null && !request.getObservacion().trim().isEmpty() ? request.getObservacion().trim() : null)
@@ -27,7 +28,7 @@ public class AporteNutricionalMapper {
         entity.setEspecieParteComestible(especieParte);
         entity.setNutriente(nutriente);
         entity.setFuente(fuente);
-        entity.setCantidad(request.getCantidad());
+        entity.setCantidad(request.getCantidad() != null ? request.getCantidad().setScale(4, RoundingMode.HALF_UP) : null);
         entity.setUnidadMedida(request.getUnidadMedida() != null && !request.getUnidadMedida().trim().isEmpty() ? request.getUnidadMedida().trim() : null);
         entity.setPorcionReferencia(request.getPorcionReferencia().trim());
         entity.setObservacion(request.getObservacion() != null && !request.getObservacion().trim().isEmpty() ? request.getObservacion().trim() : null);

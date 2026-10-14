@@ -14,4 +14,5 @@ public interface NutrienteService {
     void desactivar(Long id);
     List<NutrienteResponse> buscarPorNombre(String palabraClave);
     List<NutrienteResponse> buscarPorCategoria(CategoriaNutriente categoria);
+    NutrienteResponse activar(Long id);
 }

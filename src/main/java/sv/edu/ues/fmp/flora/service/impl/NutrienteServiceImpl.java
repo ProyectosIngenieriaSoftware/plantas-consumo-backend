@@ -126,4 +126,16 @@ public class NutrienteServiceImpl implements NutrienteService {
         }
         return respuestas;
     }
+    @Override
+    @Transactional
+    public NutrienteResponse activar(Long id) {
+        Nutriente entidad = buscarOFallar(id);
+
+        // Si ya está activo, no hacemos nada y lo devolvemos
+        if (!Boolean.TRUE.equals(entidad.getActivo())) {
+            entidad.setActivo(true);
+        }
+
+        return nutrienteMapper.toResponse(entidad);
+    }
 }
