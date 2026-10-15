@@ -16,7 +16,7 @@ public interface ImagenEspecieService {
     ImagenEspecieResponse actualizar(Long id, ImagenEspecieRequest request);
     /** Da de baja sin eliminar físicamente el registro. */
     void desactivar(Long id);
-    /** Reactiva y recupera el puesto principal cuando corresponda. */
+    /** Reactiva sin recuperar el puesto principal; la promoción debe pedirse explícitamente. */
     ImagenEspecieResponse activar(Long id);
     /** Promueve una imagen activa de forma idempotente. */
     ImagenEspecieResponse marcarComoPrincipal(Long id);

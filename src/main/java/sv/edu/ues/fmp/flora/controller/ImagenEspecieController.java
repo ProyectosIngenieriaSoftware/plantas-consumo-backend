@@ -46,7 +46,7 @@ public class ImagenEspecieController {
 
     /** Permite repetir la baja, incluso para la imagen principal. */
     @Operation(summary = "Desactivar una imagen",
-            description = "Baja lógica idempotente; no elimina la fila. Se permite desactivar la principal.")
+            description = "Baja lógica idempotente; no elimina la fila y quita la condición de principal.")
     @ApiResponse(responseCode = "204", description = "Imagen desactivada")
     @ApiResponse(responseCode = "400", description = "Identificador inválido")
     @ApiResponse(responseCode = "404", description = "La imagen no existe")
@@ -56,9 +56,9 @@ public class ImagenEspecieController {
         return ResponseEntity.noContent().build();
     }
 
-    /** Reactiva la imagen y recupera su condición de principal cuando corresponda. */
+    /** Reactiva la imagen sin convertirla en principal. */
     @Operation(summary = "Activar una imagen",
-            description = "Idempotente. Si conservaba esPrincipal=true, desplaza a la principal activa actual.")
+            description = "Idempotente. Reactiva sin cambiar la principal actual. Para promoverla, use marcar-principal.")
     @ApiResponse(responseCode = "200", description = "Imagen activa")
     @ApiResponse(responseCode = "400", description = "Identificador inválido")
     @ApiResponse(responseCode = "404", description = "La imagen o la parte comestible no existe")
