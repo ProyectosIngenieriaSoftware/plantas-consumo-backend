@@ -18,9 +18,6 @@ public class ImagenEspecieRequest {
 
     @NotBlank(message = "La URL de la imagen es obligatoria")
     @Size(max = 1000, message = "La URL no puede exceder 1000 caracteres")
-    // Pattern acepta null: NotBlank valida la ausencia. Ambos errores apuntan a urlImagen.
-    @Pattern(regexp = "^https?://([\\w-]+\\.)+[a-zA-Z]{2,}(:\\d{1,5})?(/[^\\s]*)?$",
-            message = "La URL de la imagen debe tener un formato válido (http:// o https://)")
     private String urlImagen;
 
     @Size(max = 200, message = "El título no puede exceder 200 caracteres")
@@ -38,4 +35,14 @@ public class ImagenEspecieRequest {
     /** Omitido o nulo equivale a false, también al reemplazar mediante PUT. */
     private Boolean esPrincipal;
 
+    private static final java.util.regex.Pattern PATRON_URL =
+            java.util.regex.Pattern.compile("^https?://([\\w-]+\\.)+[a-zA-Z]{2,}(:\\d{1,5})?(/[^\\s]*)?$");
+
+    /** Comprueba el formato HTTP(S); deja el caso null a @NotBlank para evitar la clave fantasma urlValida. */
+    @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @AssertTrue(message = "La URL de la imagen debe tener un formato válido (http:// o https://)")
+    public boolean isUrlValida() {
+        return urlImagen == null || PATRON_URL.matcher(urlImagen).matches();
+    }
 }

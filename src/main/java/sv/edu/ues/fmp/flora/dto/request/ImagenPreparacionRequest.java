@@ -51,7 +51,7 @@ public class ImagenPreparacionRequest {
     @JsonIgnore
     @AssertTrue(message = "La URL de la imagen debe tener un formato válido (http:// o https://)")
     public boolean isUrlValida() {
-        return urlImagen != null && PATRON_URL.matcher(urlImagen.strip()).matches();
+        return urlImagen == null || PATRON_URL.matcher(urlImagen).matches();
     }
 }
 

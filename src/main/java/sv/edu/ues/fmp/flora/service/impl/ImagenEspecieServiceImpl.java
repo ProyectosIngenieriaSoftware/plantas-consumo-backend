@@ -77,15 +77,15 @@ public class ImagenEspecieServiceImpl implements ImagenEspecieService {
         return imagenEspecieMapper.toResponse(entidad);
     }
 
-    /** Baja idempotente; al desactivar también se pierde la condición de principal. */
+    /** Baja idempotente; desactiva la imagen y desmarca su condición de principal. */
     @Override
     public void desactivar(Long id) {
         ImagenEspecie entidad = buscarOFallar(id);
-        entidad.setEsPrincipal(false);
         entidad.setActiva(false);
+        entidad.setEsPrincipal(false);
     }
 
-    /** Reactiva sin promover ni desplazar a la principal actual; operación idempotente. */
+    /** Reactiva de forma idempotente como no-principal, sin desplazar a la principal activa. */
     @Override
     public ImagenEspecieResponse activar(Long id) {
         ImagenEspecie entidad = buscarOFallar(id);
@@ -95,7 +95,6 @@ public class ImagenEspecieServiceImpl implements ImagenEspecieService {
         verificarEspecieActiva(entidad.getEspecie());
         validadorParteEspecie.resolver(entidad.getEspecie().getIdEspecie(),
                 entidad.getEspecieParte() == null ? null : entidad.getEspecieParte().getIdEspecieParte());
-        // Normaliza también bajas antiguas que conservaron esPrincipal=true.
         entidad.setEsPrincipal(false);
         entidad.setActiva(true);
         return imagenEspecieMapper.toResponse(entidad);
