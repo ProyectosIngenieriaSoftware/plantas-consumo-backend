@@ -88,10 +88,8 @@ public class ImagenPreparacionServiceImpl implements ImagenPreparacionService {
     @Override
     public void desactivar(Long id) {
         ImagenPreparacion entidad = buscarOFallar(id);
-        if (!Boolean.TRUE.equals(entidad.getActiva())) {
-            return;
-        }
         entidad.setActiva(false);
+        entidad.setEsPrincipal(false);
     }
 
     @Override
@@ -103,10 +101,7 @@ public class ImagenPreparacionServiceImpl implements ImagenPreparacionService {
 
         verificarPreparacionActiva(entidad.getPreparacion());
 
-        if (Boolean.TRUE.equals(entidad.getEsPrincipal())) {
-            desmarcarPrincipalActual(entidad.getPreparacion().getIdPreparacion());
-        }
-
+        entidad.setEsPrincipal(false);
         entidad.setActiva(true);
         return imagenPreparacionMapper.toResponse(entidad);
     }

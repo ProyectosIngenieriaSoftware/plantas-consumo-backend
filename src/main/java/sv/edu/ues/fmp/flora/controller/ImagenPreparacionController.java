@@ -65,7 +65,7 @@ public class ImagenPreparacionController {
     }
 
     @Operation(summary = "Desactivar una imagen de preparación",
-            description = "Baja lógica idempotente (activa=false). No elimina físicamente el registro.")
+            description = "Baja lógica idempotente (activa=false, esPrincipal=false). No elimina físicamente el registro.")
     @ApiResponse(responseCode = "204", description = "Imagen desactivada")
     @ApiResponse(responseCode = "400", description = "Identificador inválido")
     @ApiResponse(responseCode = "404", description = "La imagen no existe")
@@ -76,7 +76,7 @@ public class ImagenPreparacionController {
     }
 
     @Operation(summary = "Reactivar una imagen de preparación",
-            description = "Idempotente. Si conservaba esPrincipal=true, desplaza a la principal activa actual.")
+            description = "Idempotente. La imagen se reactiva como no-principal.")
     @ApiResponse(responseCode = "200", description = "Imagen activada")
     @ApiResponse(responseCode = "400", description = "Identificador inválido")
     @ApiResponse(responseCode = "404", description = "La imagen no existe")

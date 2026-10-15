@@ -35,15 +35,14 @@ public class ImagenEspecieRequest {
     /** Omitido o nulo equivale a false, también al reemplazar mediante PUT. */
     private Boolean esPrincipal;
 
-    // Mismo patrón que FuenteRequest.URL_VALIDA, que es privado en ese DTO.
-    private static final java.util.regex.Pattern URL_VALIDA =
+    private static final java.util.regex.Pattern PATRON_URL =
             java.util.regex.Pattern.compile("^https?://([\\w-]+\\.)+[a-zA-Z]{2,}(:\\d{1,5})?(/[^\\s]*)?$");
 
-    /** Comprueba el formato HTTP(S) sobre el mismo valor que guardará el mapper. */
+    /** Comprueba el formato HTTP(S); deja el caso null a @NotBlank para evitar la clave fantasma urlValida. */
     @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
     @com.fasterxml.jackson.annotation.JsonIgnore
     @AssertTrue(message = "La URL de la imagen debe tener un formato válido (http:// o https://)")
     public boolean isUrlValida() {
-        return urlImagen != null && URL_VALIDA.matcher(urlImagen.strip()).matches();
+        return urlImagen == null || PATRON_URL.matcher(urlImagen).matches();
     }
 }
