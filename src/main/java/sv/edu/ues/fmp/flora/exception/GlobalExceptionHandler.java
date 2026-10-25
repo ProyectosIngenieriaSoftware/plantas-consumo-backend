@@ -1,6 +1,8 @@
 package sv.edu.ues.fmp.flora.exception;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -29,6 +31,9 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.exc.InputCoercionException;
+import tools.jackson.databind.DatabindException;
 import tools.jackson.databind.exc.InvalidFormatException;
 import tools.jackson.databind.exc.InvalidNullException;
 import tools.jackson.databind.exc.MismatchedInputException;
@@ -295,6 +300,45 @@ public class GlobalExceptionHandler {
         Throwable causa = ex.getCause();
 
         /*
+         * Caso 0:
+         * Numero sintacticamente valido pero fuera del rango del tipo destino.
+         *
+         * Ejemplo:
+         * "idEspecie": 99999999999999999999
+         *
+         * QA observo (AN-H08) que esto respondia "El cuerpo de la solicitud no
+         * tiene un formato JSON valido", culpando al JSON de un problema que
+         * no era suyo: el JSON estaba bien formado, el valor no cabia en un
+         * long. Va antes que los demas casos porque Jackson envuelve la
+         * InputCoercionException dentro de una excepcion de databind que
+         * tambien encaja en los instanceof de abajo.
+         */
+        InputCoercionException fueraDeRango = buscarFueraDeRango(causa);
+        if (fueraDeRango != null) {
+
+            String campo = causa instanceof DatabindException error
+                    ? nombreDelCampo(error.getPath())
+                    : null;
+            if (campo == null) {
+                campo = campoDelParser(fueraDeRango);
+            }
+
+            mensaje = campo != null
+                    ? "El campo '" + campo + "' tiene un valor numérico fuera de rango"
+                    : "La solicitud contiene un valor numérico fuera de rango";
+
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(ErrorResponse.builder()
+                            .timestamp(LocalDateTime.now())
+                            .estado(HttpStatus.BAD_REQUEST.value())
+                            .error("Solicitud mal formada")
+                            .mensaje(mensaje)
+                            .ruta(request.getRequestURI())
+                            .build());
+        }
+
+        /*
          * Caso 1:
          * Enum inválido.
          *
@@ -306,7 +350,20 @@ public class GlobalExceptionHandler {
             String campo = nombreDelCampo(error.getPath());
             Class<?> tipo = error.getTargetType();
 
-            if (tipo != null && tipo.isEnum()) {
+            if (esFechaUHora(tipo)) {
+                /*
+                 * Fecha en un formato que no es el del contrato.
+                 *
+                 * Ejemplos: "15/10/2026" o "2026-10-15T10:30:00" en
+                 * fechaObservacion, que con @JsonFormat(pattern="yyyy-MM-dd")
+                 * y lectura no leniente ya no se aceptan. Antes el mensaje
+                 * decia solo "tipo de dato incorrecto", sin indicar el formato
+                 * esperado (AN-H10).
+                 */
+                mensaje = campo != null
+                        ? "El campo '" + campo + "' debe tener el formato yyyy-MM-dd"
+                        : "La fecha debe tener el formato yyyy-MM-dd";
+            } else if (tipo != null && tipo.isEnum()) {
 
                 String valoresPermitidos =
                         Arrays.stream(tipo.getEnumConstants())
@@ -624,6 +681,50 @@ public class GlobalExceptionHandler {
                 yield estado != null ? estado.getReasonPhrase() : "Error " + codigo;
             }
         };
+    }
+
+    /**
+     * Recorre la cadena de causas buscando el desbordamiento numerico.
+     * <p>
+     * Jackson lanza la {@link InputCoercionException} en la capa de parseo y
+     * la capa de databind la envuelve para poder adjuntar la ruta del campo,
+     * asi que no basta con mirar la causa directa.
+     */
+    private static InputCoercionException buscarFueraDeRango(Throwable causa) {
+        for (Throwable actual = causa; actual != null; actual = actual.getCause()) {
+            if (actual instanceof InputCoercionException error) {
+                return error;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Nombre del campo que estaba leyendo el parser cuando desbordo.
+     * <p>
+     * La {@link InputCoercionException} la lanza la capa de parseo, que no
+     * conoce el objeto que se esta poblando, asi que no trae la ruta de
+     * propiedades que si traen las excepciones de databind. Lo que si trae es
+     * el propio parser, detenido sobre el valor culpable: su campo actual es
+     * el que hay que nombrarle al cliente.
+     */
+    private static String campoDelParser(InputCoercionException ex) {
+        if (!(ex.processor() instanceof JsonParser parser)) {
+            return null;
+        }
+        try {
+            return parser.currentName();
+        } catch (Exception e) {
+            // El parser ya puede estar cerrado; el mensaje generico sirve igual.
+            return null;
+        }
+    }
+
+    /** Tipos de fecha/hora de java.time que la API recibe en los cuerpos. */
+    private static boolean esFechaUHora(Class<?> tipo) {
+        return tipo == LocalDate.class
+                || tipo == LocalDateTime.class
+                || tipo == LocalTime.class;
     }
 
     /**
