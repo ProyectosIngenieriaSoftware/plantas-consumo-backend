@@ -10,9 +10,11 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -23,6 +25,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.exc.InvalidFormatException;
@@ -449,6 +453,86 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * El cuerpo llega con un Content-Type que la ruta no sabe leer (por
+     * ejemplo {@code POST /api/especies/1/videos} con
+     * {@code Content-Type: text/plain}) -> 415 UNSUPPORTED MEDIA TYPE.
+     * <p>
+     * Mismo caso que {@link #manejarMetodoNoSoportado}: sin manejador propio
+     * la excepcion caia en {@link #manejarExcepcionNoAnticipada} y salia como
+     * 500 "Error interno", culpando al servidor de un error del cliente. Lo
+     * reporto QA en el 3er informe (modulo Video Especie, prueba del
+     * Content-Type no soportado).
+     * <p>
+     * El mensaje enumera los tipos que la ruta si acepta para que el cliente
+     * pueda corregir la llamada; si la excepcion no los trae, se nombra
+     * {@code application/json}, que es el unico formato que consume la API.
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> manejarMediaTypeNoSoportado(
+            HttpMediaTypeNotSupportedException ex,
+            HttpServletRequest request) {
+
+        List<MediaType> soportados = ex.getSupportedMediaTypes();
+        String admitidos = soportados == null || soportados.isEmpty()
+                ? MediaType.APPLICATION_JSON_VALUE
+                : soportados.stream().map(MediaType::toString).collect(Collectors.joining(", "));
+
+        String recibido = ex.getContentType() != null
+                ? "'" + ex.getContentType() + "'"
+                : "el indicado";
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value())
+                .error("Tipo de contenido no soportado")
+                .mensaje("El tipo de contenido " + recibido
+                        + " no está soportado en esta ruta. Tipos admitidos: " + admitidos)
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(cuerpo);
+    }
+
+    /**
+     * Restricciones de Bean Validation sobre parametros de metodo
+     * ({@code @Positive} en un {@code @PathVariable} de un controlador
+     * {@code @Validated}) -> 400 BAD REQUEST.
+     * <p>
+     * Hermano de {@link #manejarErroresDeValidacion}, que solo atiende el
+     * {@code @Valid} del cuerpo: las violaciones de parametros llegan como
+     * {@link ConstraintViolationException} y sin este manejador acabarian en
+     * el catch-all como 500.
+     * <p>
+     * La ruta de la violacion viene como "metodo.parametro"; al cliente solo
+     * se le devuelve el ultimo tramo, que es el nombre del parametro.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> manejarViolacionesDeParametros(
+            ConstraintViolationException ex,
+            HttpServletRequest request) {
+
+        Map<String, String> erroresValidacion = new HashMap<>();
+
+        for (ConstraintViolation<?> violacion : ex.getConstraintViolations()) {
+            erroresValidacion.put(
+                    ultimoTramo(violacion.getPropertyPath().toString()),
+                    violacion.getMessage()
+            );
+        }
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.BAD_REQUEST.value())
+                .error("Error de validación")
+                .mensaje("La solicitud contiene parámetros inválidos")
+                .ruta(request.getRequestURI())
+                .erroresValidacion(erroresValidacion)
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(cuerpo);
+    }
+
+    /**
      * Red de seguridad final: cualquier excepcion que no coincida con ninguno
      * de los manejadores anteriores -> 500 INTERNAL SERVER ERROR.
      * <p>
@@ -540,6 +624,15 @@ public class GlobalExceptionHandler {
                 yield estado != null ? estado.getReasonPhrase() : "Error " + codigo;
             }
         };
+    }
+
+    /**
+     * Ultimo tramo de una ruta de propiedad separada por puntos; para
+     * "crear.idPreparacion" devuelve "idPreparacion".
+     */
+    private static String ultimoTramo(String rutaDePropiedad) {
+        int ultimoPunto = rutaDePropiedad.lastIndexOf('.');
+        return ultimoPunto < 0 ? rutaDePropiedad : rutaDePropiedad.substring(ultimoPunto + 1);
     }
 
     /**
