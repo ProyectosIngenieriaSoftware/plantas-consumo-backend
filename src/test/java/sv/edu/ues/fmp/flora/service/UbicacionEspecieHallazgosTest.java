@@ -14,6 +14,7 @@ import sv.edu.ues.fmp.flora.entity.Especie;
 import sv.edu.ues.fmp.flora.entity.UbicacionEspecie;
 import sv.edu.ues.fmp.flora.exception.EstadoInvalidoException;
 import sv.edu.ues.fmp.flora.exception.RecursoDuplicadoException;
+import sv.edu.ues.fmp.flora.exception.RecursoNoEncontradoException;
 import sv.edu.ues.fmp.flora.repository.DistritoRepository;
 import sv.edu.ues.fmp.flora.repository.EspecieRepository;
 import sv.edu.ues.fmp.flora.repository.MunicipioRepository;
@@ -38,6 +39,10 @@ import static org.mockito.Mockito.when;
  * Reglas de negocio de Ubicacion de Especie exigidas por el 3er reporte de QA:
  * AN-H03 (editar una desactivada), AN-H05 (departamento en null),
  * AN-H06 (duplicado de coordenadas) y AN-H13 (desactivar dos veces).
+ * <p>
+ * Cubre tambien la reactivacion, que comparte la regla de AN-H06: el indice
+ * parcial de V11 solo admite una ubicacion activa por coordenada, asi que
+ * revertir una baja puede chocar con otra fila que ocupo ese sitio.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -98,6 +103,90 @@ class UbicacionEspecieHallazgosTest {
         service.desactivarUbicacion(10L);
 
         assertEquals(false, ubicacion.getActiva(), "La primera baja sí debe aplicarse");
+    }
+
+    // ---------- reactivar: revertir la baja respetando el índice parcial de V11 ----------
+
+    @Test
+    void reactivarUbicacionDesactivada_laVuelveAActivar() {
+        UbicacionEspecie ubicacion = ubicacion(30L, false);
+        when(ubicacionEspecieRepository.findById(30L)).thenReturn(Optional.of(ubicacion));
+        when(ubicacionEspecieRepository.saveAndFlush(any()))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(municipioRepository.findDepartamentosPorMunicipio(anyCollection()))
+                .thenReturn(List.of(departamentoDeMunicipio(70L, "San Vicente")));
+
+        UbicacionEspecieResponse response = service.reactivarUbicacion(30L);
+
+        assertEquals(true, ubicacion.getActiva(), "La reactivación debe aplicarse");
+        assertEquals(true, response.getActiva(), "La respuesta debe reflejar el nuevo estado");
+        verify(ubicacionEspecieRepository).saveAndFlush(ubicacion);
+    }
+
+    @Test
+    void reactivarCuandoOtraOcupaLasCoordenadas_lanzaRecursoDuplicado() {
+        UbicacionEspecie ubicacion = ubicacion(31L, false);
+        when(ubicacionEspecieRepository.findById(31L)).thenReturn(Optional.of(ubicacion));
+        when(ubicacionEspecieRepository
+                .existsByEspecieIdEspecieAndLatitudAndLongitudAndActivaTrueAndIdUbicacionNot(
+                        1L, LATITUD, LONGITUD, 31L))
+                .thenReturn(true);
+
+        RecursoDuplicadoException ex = assertThrows(RecursoDuplicadoException.class,
+                () -> service.reactivarUbicacion(31L));
+
+        assertTrue(ex.getMessage().contains("coordenadas"),
+                "El 409 debe señalar el choque de coordenadas: " + ex.getMessage());
+        // El índice parcial de V11 solo admite una fila activa por coordenada:
+        // la ubicación tiene que quedarse de baja, sin tocar la base.
+        assertEquals(false, ubicacion.getActiva(), "No debe reactivarse nada");
+        verify(ubicacionEspecieRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void reactivarUbicacionDeEspecieDesactivada_lanzaEstadoInvalido() {
+        UbicacionEspecie ubicacion = UbicacionEspecie.builder()
+                .idUbicacion(33L)
+                .especie(especie(false))
+                .distrito(distrito())
+                .nombreLugar("Cerro Las Pavas")
+                .latitud(LATITUD)
+                .longitud(LONGITUD)
+                .activa(false)
+                .build();
+        when(ubicacionEspecieRepository.findById(33L)).thenReturn(Optional.of(ubicacion));
+
+        EstadoInvalidoException ex = assertThrows(EstadoInvalidoException.class,
+                () -> service.reactivarUbicacion(33L));
+
+        assertTrue(ex.getMessage().contains("especie desactivada"),
+                "Debe rechazar con el mismo mensaje que crear y actualizar: " + ex.getMessage());
+        assertEquals(false, ubicacion.getActiva(), "No debe reactivarse nada");
+        verify(ubicacionEspecieRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void reactivarUbicacionInexistente_lanzaRecursoNoEncontrado() {
+        when(ubicacionEspecieRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> service.reactivarUbicacion(999L));
+
+        verify(ubicacionEspecieRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void reactivarUbicacionYaActiva_lanzaEstadoInvalido() {
+        UbicacionEspecie ubicacion = ubicacion(32L, true);
+        when(ubicacionEspecieRepository.findById(32L)).thenReturn(Optional.of(ubicacion));
+
+        EstadoInvalidoException ex = assertThrows(EstadoInvalidoException.class,
+                () -> service.reactivarUbicacion(32L));
+
+        // Simétrico a AN-H13: repetir la operación avisa, no responde 200 en vano.
+        assertTrue(ex.getMessage().contains("ya está activa"),
+                "Repetir la reactivación debe informar que no cambió nada");
+        verify(ubicacionEspecieRepository, never()).saveAndFlush(any());
     }
 
     // ---------- AN-H06: duplicado de coordenadas ----------

@@ -9,12 +9,15 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import sv.edu.ues.fmp.flora.config.JacksonConfig;
+import sv.edu.ues.fmp.flora.dto.response.UbicacionEspecieResponse;
 import sv.edu.ues.fmp.flora.exception.GlobalExceptionHandler;
 import sv.edu.ues.fmp.flora.service.UbicacionEspecieService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -131,6 +134,28 @@ class UbicacionEspecieCuerpoTest {
         mockMvc.perform(post(RUTA).contentType(MediaType.APPLICATION_JSON)
                         .content(cuerpoConFecha("2026-10-15")))
                 .andExpect(status().isCreated());
+    }
+
+    // ---------- reactivar: cableado de la ruta PATCH ----------
+
+    /**
+     * Las reglas de la reactivacion se prueban en el servicio; aqui solo se
+     * comprueba que la ruta PATCH exista y devuelva 200 con el DTO del modulo,
+     * igual que el resto de los /{id}/activar del proyecto.
+     */
+    @Test
+    void reactivar_respondeOkConElEstadoNuevo() throws Exception {
+        when(ubicacionEspecieService.reactivarUbicacion(30L))
+                .thenReturn(UbicacionEspecieResponse.builder()
+                        .idUbicacion(30L)
+                        .idEspecie(1L)
+                        .activa(true)
+                        .build());
+
+        mockMvc.perform(patch(RUTA + "/30/activar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idUbicacion").value(30))
+                .andExpect(jsonPath("$.activa").value(true));
     }
 
     private static String cuerpoConFecha(String fechaObservacion) {

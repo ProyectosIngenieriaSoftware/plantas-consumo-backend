@@ -45,6 +45,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UbicacionEspecieServiceImpl implements UbicacionEspecieService {
 
+    /**
+     * Una especie dada de baja no gestiona ubicaciones: lo rechazan crear,
+     * actualizar y reactivar, y los tres deben decirlo con las mismas palabras.
+     */
+    private static final String MSG_ESPECIE_DESACTIVADA =
+            "No se pueden registrar ubicaciones para una especie desactivada.";
+
     private final UbicacionEspecieRepository ubicacionEspecieRepository;
     private final EspecieRepository especieRepository;
     private final DistritoRepository distritoRepository;
@@ -58,8 +65,7 @@ public class UbicacionEspecieServiceImpl implements UbicacionEspecieService {
                         "No existe una especie con id " + request.getIdEspecie()));
 
         if (!Boolean.TRUE.equals(especie.getActiva())) {
-            throw new EstadoInvalidoException(
-                    "No se pueden registrar ubicaciones para una especie desactivada.");
+            throw new EstadoInvalidoException(MSG_ESPECIE_DESACTIVADA);
         }
 
         Distrito distrito = distritoRepository.findById(request.getIdDistrito())
@@ -120,8 +126,7 @@ public class UbicacionEspecieServiceImpl implements UbicacionEspecieService {
                         "No existe una especie con id " + request.getIdEspecie()));
 
         if (!Boolean.TRUE.equals(especie.getActiva())) {
-            throw new EstadoInvalidoException(
-                    "No se pueden registrar ubicaciones para una especie desactivada.");
+            throw new EstadoInvalidoException(MSG_ESPECIE_DESACTIVADA);
         }
 
         Distrito distrito = distritoRepository.findById(request.getIdDistrito())
@@ -159,10 +164,48 @@ public class UbicacionEspecieServiceImpl implements UbicacionEspecieService {
         ubicacion.setActiva(false);
     }
 
+    @Override
+    @Transactional
+    public UbicacionEspecieResponse reactivarUbicacion(Long idUbicacion) {
+        UbicacionEspecie ubicacion = ubicacionEspecieRepository.findById(idUbicacion)
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "No existe una ubicación con id " + idUbicacion));
+
+        // Simetrico a desactivarUbicacion (AN-H13): repetir la operacion no
+        // cambia nada, y decirlo vale mas que un 200 que finge haber hecho algo.
+        if (Boolean.TRUE.equals(ubicacion.getActiva())) {
+            throw new EstadoInvalidoException("La ubicación ya está activa.");
+        }
+
+        // Misma regla (y mismo mensaje) que crear y actualizar: una especie dada
+        // de baja no gestiona ubicaciones, y reactivar una la devolveria a la
+        // vista. El estado sale de la asociacion que ya trae la fila, sin volver
+        // a consultar el repositorio de especies.
+        if (!Boolean.TRUE.equals(ubicacion.getEspecie().getActiva())) {
+            throw new EstadoInvalidoException(MSG_ESPECIE_DESACTIVADA);
+        }
+
+        // Lo que distingue a reactivar de un simple activa = true: el indice
+        // parcial uk_ubicacion_especie_coords_activa (V11) solo deja una fila
+        // activa por (especie, latitud, longitud), y mientras esta ubicacion
+        // estuvo de baja otra pudo ocupar su sitio. Se excluye a si misma.
+        verificarCoordenadasLibres(ubicacion.getEspecie().getIdEspecie(),
+                ubicacion.getLatitud(), ubicacion.getLongitud(), idUbicacion);
+
+        ubicacion.setActiva(true);
+
+        // saveAndFlush y no save: adelanta el UPDATE dentro de la transaccion,
+        // asi una carrera contra el indice parcial sale como
+        // DataIntegrityViolationException (409) y no como un fallo en el commit.
+        UbicacionEspecie reactivada = ubicacionEspecieRepository.saveAndFlush(ubicacion);
+
+        return mapearAResponse(reactivada);
+    }
+
     /**
      * Rechaza repetir las coordenadas de una ubicacion activa de la misma
      * especie (AN-H06). {@code idExcluido} es el propio registro cuando la
-     * comprobacion viene de una actualizacion.
+     * comprobacion viene de una actualizacion o de una reactivacion.
      */
     private void verificarCoordenadasLibres(Long idEspecie, BigDecimal latitud,
                                             BigDecimal longitud, Long idExcluido) {
