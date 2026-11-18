@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioCambioClaveRequest;
+import sv.edu.ues.fmp.flora.dto.request.UsuarioCambioCredencialesRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioCreationRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioLoginRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioUpdateRequest;
@@ -46,7 +47,9 @@ public class UsuarioServiceImpl implements UsuarioService {
     /**
      * Las reglas de SEG-H09 que protegen el acceso de administracion. Las
      * mismas que aplica {@code UsuarioRolServiceImpl} al asignar o quitar el
-     * rol ADMINISTRADOR; aqui se usan para la baja logica.
+     * rol ADMINISTRADOR; aqui se usan en las dos vias que mutan al usuario:
+     * la baja logica ({@link #desactivar(Long)}, R1-R5) y la edicion
+     * ({@link #actualizar(Long, UsuarioUpdateRequest)}, R6).
      */
     private final ProteccionDeAdministracion proteccionDeAdministracion;
 
@@ -93,6 +96,44 @@ public class UsuarioServiceImpl implements UsuarioService {
     public UsuarioResponse actualizar(Long id, UsuarioUpdateRequest request) {
         Usuario entidad = buscarOFallar(id);
 
+        // SEG-H09 R6. La edicion era la via que no pasaba por ninguna regla: un
+        // administrador normal cambiaba los datos del superadministrador, y
+        // mientras el DTO llevaba el correo, eso alcanzaba para quedarse con su
+        // cuenta a traves del recuperar-clave publico.
+        //
+        // Va despues de buscarOFallar por el mismo motivo que en desactivar: un
+        // id inexistente sigue siendo 404 y no 403.
+        proteccionDeAdministracion.verificarEdicion(entidad);
+
+        // Ya no hay nada que comprobar por duplicado: el DTO solo trae nombres
+        // y apellidos, que no son unicos. La unicidad de correo y nombre de
+        // usuario se comprueba donde ahora se escriben --crear() y
+        // cambiarCredenciales()--.
+        usuarioMapper.updateEntity(entidad, request);
+
+        Usuario actualizado = usuarioRepository.saveAndFlush(entidad);
+
+        return usuarioMapper.toResponse(actualizado);
+    }
+
+    @Override
+    @Transactional
+    public UsuarioResponse cambiarCredenciales(Long id, UsuarioCambioCredencialesRequest request) {
+        Usuario entidad = buscarOFallar(id);
+
+        // No hay llamada a ProteccionDeAdministracion y no hace falta: el
+        // @PreAuthorize del controlador ya garantizo que el objetivo es quien
+        // llama, asi que el caso que R6 prohibe --tocar la cuenta de otro-- no
+        // puede llegar hasta aqui. El superadministrador cambia sus propias
+        // credenciales como cualquier otro usuario.
+
+        // La clave actual, antes de tocar nada: es la prueba de que quien pide
+        // el cambio es la persona y no una sesion abierta sin vigilancia. Mismo
+        // criterio y mismo 401 que cambiarClave.
+        if (!passwordEncoder.matches(request.claveActual(), entidad.getClaveHash())) {
+            throw new CredencialesInvalidasException("La clave actual no es correcta");
+        }
+
         usuarioRepository.findByCorreoIgnoreCase(request.correo())
                 .filter(otro -> !otro.getIdUsuario().equals(id))
                 .ifPresent(otro -> {
@@ -104,10 +145,11 @@ public class UsuarioServiceImpl implements UsuarioService {
                 .filter(otro -> !otro.getIdUsuario().equals(id))
                 .ifPresent(otro -> {
                     throw new RecursoDuplicadoException(
-                            "Ya existe otro usuario con el nombre de usuario " + request.nombreUsuario());
+                            "Ya existe otro usuario con el nombre de usuario "
+                                    + request.nombreUsuario());
                 });
 
-        usuarioMapper.updateEntity(entidad, request);
+        usuarioMapper.updateCredenciales(entidad, request);
 
         Usuario actualizado = usuarioRepository.saveAndFlush(entidad);
 

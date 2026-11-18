@@ -41,7 +41,19 @@ public class EpocaCosechaServiceImpl implements EpocaCosechaService {
             Long idEspecieParte,
             boolean soloActivas
     ) {
-        buscarParteOFallar(idEspecieParte);
+        EspecieParteComestible parte = buscarParteOFallar(idEspecieParte);
+
+        // La parte de una ficha sin publicar se responde como una parte que no
+        // existe: el mismo 404 que acaba de lanzar buscarParteOFallar. Es el
+        // filtro que ya aplicaban los hermanos de este listado
+        // --PreparacionConsumoServiceImpl.listarPorParte y
+        // AporteNutricionalServiceImpl-- y el que faltaba aqui; mientras
+        // faltaba, la ruta se cerraba con ESPECIE_CONSULTAR y el catalogo
+        // publico se quedaba sin las epocas de cosecha de las fichas
+        // PUBLICADAS.
+        if (!visibilidadDeEspecie.puedeVer(parte.getEspecie().getIdEspecie())) {
+            throw parteNoEncontrada(idEspecieParte);
+        }
 
         List<EpocaCosecha> epocas = soloActivas
                 ? epocaCosechaRepository
@@ -176,9 +188,22 @@ public class EpocaCosechaServiceImpl implements EpocaCosechaService {
         validarId(id);
 
         return parteComestibleRepository.findById(id)
-                .orElseThrow(() -> new RecursoNoEncontradoException(
-                        "No existe la parte comestible con id " + id
-                ));
+                .orElseThrow(() -> parteNoEncontrada(id));
+    }
+
+    /**
+     * El 404 de la parte, en un solo sitio.
+     * <p>
+     * Lo lanzan dos caminos y tiene que decir exactamente lo mismo en los dos:
+     * la parte que no existe y --desde el filtro de visibilidad de
+     * {@link #listarPorParte(Long, boolean)}-- la parte de una ficha que quien
+     * llama no puede ver. Si los mensajes difirieran, la diferencia delataria
+     * que ese id esta ocupado por una ficha sin publicar.
+     */
+    private static RecursoNoEncontradoException parteNoEncontrada(Long id) {
+        return new RecursoNoEncontradoException(
+                "No existe la parte comestible con id " + id
+        );
     }
 
     private EpocaCosecha buscarEpocaOFallar(Long id) {

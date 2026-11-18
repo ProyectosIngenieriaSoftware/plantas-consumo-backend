@@ -46,11 +46,24 @@ import sv.edu.ues.fmp.flora.service.JwtService;
  * dentro de un BUILD SUCCESS.
  * <p>
  * Ahora {@link SiembraDeFichas} siembra tres fichas --BORRADOR, EN_REVISION y
- * PUBLICADA-- cada una con el arbol completo, y los catorce casos se arman con
+ * PUBLICADA-- cada una con el arbol completo, y los quince casos se arman con
  * los ids de lo sembrado. La prueba ya no depende de lo que haya en la base:
- * cubre siempre los catorce recursos en los tres estados, incluida la cadena de
+ * cubre siempre los quince recursos en los tres estados, incluida la cadena de
  * tres saltos {@code imagen -> preparacion -> parte comestible -> especie}, que
  * era la que menos datos tenia y la unica con una forma distinta a las demas.
+ *
+ * <h2>El decimoquinto: el listado de epocas de cosecha</h2>
+ * {@code GET /api/epocas-cosecha?idEspecieParte={id}} entro aqui despues, y es
+ * el unico caso que lleva el id del padre en un parametro de consulta en vez de
+ * en la ruta. Estaba cerrado con {@code ESPECIE_CONSULTAR} en
+ * {@code LISTADOS_GLOBALES} --no filtrado-- porque
+ * {@code EpocaCosechaServiceImpl.listarPorParte} era el unico hermano que no
+ * aplicaba {@code VisibilidadDeEspecie}. Como era el unico listado de epocas,
+ * el permiso dejaba al catalogo publico sin la epoca de cosecha de las fichas
+ * PUBLICADAS. Ya aplica el filtro, de modo que las cuatro afirmaciones de esta
+ * clase valen para el igual que para los demas: 404 al anonimo sobre un
+ * borrador, mismo cuerpo que un id inventado, 200 sobre una publicada y 200 con
+ * el permiso.
  * <p>
  * Todo lo sembrado vive en la transaccion de la prueba y el rollback de
  * {@code @Transactional} se lo lleva.
@@ -105,8 +118,8 @@ class EspecieRutasPlanasVisibilidadTest {
     }
 
     /**
-     * Los catorce recursos del alcance, armados con los ids de la ficha
-     * sembrada. Los diez primeros llevan el id del hijo; los cuatro ultimos
+     * Los quince recursos del alcance, armados con los ids de la ficha
+     * sembrada. Los diez primeros llevan el id del hijo; los cinco ultimos
      * cuelgan de un id intermedio (la parte, la preparacion, la especie) y
      * tambien tenian que entrar por el padre.
      */
@@ -145,7 +158,18 @@ class EspecieRutasPlanasVisibilidadTest {
                         "/api/videos-preparacion/preparacion/"
                                 + ficha.preparacion().getIdPreparacion()),
                 new Caso("ubicaciones de una especie",
-                        "/api/ubicaciones/especie/" + ficha.id()));
+                        "/api/ubicaciones/especie/" + ficha.id()),
+                // El que llego tarde: era el unico listado de epocas de
+                // cosecha y estaba cerrado con ESPECIE_CONSULTAR en lugar de
+                // filtrado, porque EpocaCosechaServiceImpl.listarPorParte era
+                // el unico hermano sin VisibilidadDeEspecie. Con el permiso
+                // puesto, la epoca de cosecha de una ficha PUBLICADA no se
+                // podia leer sin token: el catalogo publico se quedaba sin ese
+                // sub-recurso. Ahora entra aqui, con sus hermanos de id de
+                // padre, y responde 200 o 404 segun el estado de la ficha.
+                new Caso("epocas de una parte",
+                        "/api/epocas-cosecha?idEspecieParte="
+                                + ficha.parte().getIdEspecieParte()));
     }
 
     // ---------- 1. El anonimo no ve los hijos de un borrador ----------
@@ -265,7 +289,8 @@ class EspecieRutasPlanasVisibilidadTest {
                 "/api/preparaciones-consumo/parte/" + ID_INEXISTENTE,
                 "/api/imagenes-preparacion/preparacion/" + ID_INEXISTENTE,
                 "/api/videos-preparacion/preparacion/" + ID_INEXISTENTE,
-                "/api/ubicaciones/especie/" + ID_INEXISTENTE);
+                "/api/ubicaciones/especie/" + ID_INEXISTENTE,
+                "/api/epocas-cosecha?idEspecieParte=" + ID_INEXISTENTE);
 
         for (String ruta : rutas) {
             mockMvc.perform(get(ruta))

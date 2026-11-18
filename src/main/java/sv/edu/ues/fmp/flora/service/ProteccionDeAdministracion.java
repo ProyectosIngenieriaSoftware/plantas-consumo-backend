@@ -13,7 +13,7 @@ import sv.edu.ues.fmp.flora.repository.UsuarioRepository;
 import sv.edu.ues.fmp.flora.repository.UsuarioRolRepository;
 
 /**
- * Las cinco reglas que protegen el acceso de administracion (SEG-H09).
+ * Las seis reglas que protegen el acceso de administracion (SEG-H09).
  *
  * <h2>Que agujero cierra</h2>
  * El permiso {@code USUARIO_GESTIONAR} abre todo el modulo de seguridad, y eso
@@ -57,7 +57,33 @@ import sv.edu.ues.fmp.flora.repository.UsuarioRolRepository;
  *   <tr><td>R5 Nunca cero admins</td>
  *       <td>Ninguna operacion deja el sistema con cero administradores
  *           activos.</td><td>409</td></tr>
+ *   <tr><td>R6 Superadmin solo se edita a si mismo</td>
+ *       <td>A los datos del superadministrador no los cambia nadie mas que el.
+ *           Es el lado de la EDICION de lo que R4 ya decia de la baja y del
+ *           rol.</td>
+ *       <td>403</td></tr>
  * </table>
+ *
+ * <h2>Por que hizo falta R6</h2>
+ * R3 y R4 cubrian la baja logica y el rol, las dos vias que quitan el acceso.
+ * La via de <strong>edicion</strong> --{@code PUT /api/usuarios/{id}}-- no
+ * pasaba por aqui, y por ahi un administrador normal cambiaba los datos del
+ * superadministrador. No le podia poner {@code activo = false}
+ * --{@code UsuarioUpdateRequest} no tiene ese campo-- pero si reescribirle el
+ * {@code correo} y el {@code nombreUsuario}, que son sus credenciales de
+ * identidad: con el correo apuntando a otro buzon, el
+ * {@code POST /api/usuarios/recuperar-clave} --publico-- entregaba la cuenta
+ * del superadministrador a quien hizo el cambio. No lo daba de baja: lo
+ * suplantaba, y sin tocar ninguna de las cinco reglas.
+ * <p>
+ * Esa via se cerro por los dos lados a la vez, y por eso R6 no es la unica
+ * pieza: {@code correo} y {@code nombreUsuario} salieron del DTO de edicion
+ * --cambiarlos es autoservicio del dueño, con su clave, en
+ * {@code PUT /api/usuarios/{id}/credenciales}-- de modo que la cadena de
+ * recuperacion ya no se puede repuntar en <strong>ninguna</strong> cuenta.
+ * R6 es la mitad que protege lo que queda editable (nombres y apellidos) y la
+ * que deja la regla escrita donde se busca: el dia que el DTO de edicion vuelva
+ * a crecer, el superadministrador ya esta cubierto.
  *
  * <h2>El orden importa</h2>
  * Primero R1 y R4, que son prohibiciones absolutas y valen incluso para el
@@ -76,8 +102,9 @@ import sv.edu.ues.fmp.flora.repository.UsuarioRolRepository;
  * <p>
  * Y por que un componente y no codigo dentro de cada servicio: las mismas
  * reglas las aplican {@code UsuarioRolServiceImpl.asignar} y {@code .quitar}
- * --modulo usuario-rol--, {@code UsuarioServiceImpl.desactivar} --modulo
- * usuario-- y {@code RolServiceImpl.desactivar} --modulo rol--. Repetirlas en
+ * --modulo usuario-rol--, {@code UsuarioServiceImpl.desactivar} y
+ * {@code .actualizar} --modulo usuario-- y {@code RolServiceImpl.desactivar}
+ * --modulo rol--. Repetirlas en
  * cada sitio es como se abren los huecos, y la cuarta via fue exactamente eso:
  * {@code DELETE /api/roles/{id}} sobre el rol ADMINISTRADOR lo desactivaba
  * para todos --dejando el sistema sin administradores-- sin pasar por ninguna
@@ -221,6 +248,51 @@ public class ProteccionDeAdministracion {
         verificarQueNoEsElUltimoAdministrador(objetivo,
                 "No se puede desactivar al usuario " + objetivo.getNombreUsuario()
                         + " porque es el ultimo administrador activo del sistema");
+    }
+
+    /**
+     * Antes de cambiar los datos de un usuario.
+     *
+     * <h2>R6: a los datos del superadministrador solo los cambia el</h2>
+     * Es la unica regla que aplica aqui, y solo mira si el objetivo lleva la
+     * marca. Editar a cualquier otro usuario --incluido otro administrador--
+     * sigue siendo una operacion normal de {@code USUARIO_GESTIONAR}: lo que
+     * esta tarea protege es al superadministrador, no la edicion en general.
+     *
+     * <h2>Por que el superadmin si se edita a si mismo</h2>
+     * R6 responde "quien" y no "que": la cuenta tiene que poder corregir su
+     * propio nombre sin pedirselo a nadie, porque no hay nadie por encima a
+     * quien pedirselo. Es la diferencia con R1, que prohibe en absoluto: ahi lo
+     * peligroso era precisamente la operacion sobre uno mismo --quedarse sin
+     * acceso-- y aqui es la operacion sobre otro.
+     *
+     * <h2>Lo que no decide</h2>
+     * Ni el estado ({@code activo}) ni la marca ({@code es_superadmin}) ni los
+     * roles: ninguno de los tres esta en {@code UsuarioUpdateRequest}, asi que
+     * la via de edicion no los puede tocar ni para el superadministrador ni
+     * para nadie. La baja la cubre {@link #verificarDesactivacion(Usuario)} y
+     * el rol, {@link #verificarQuitarRol(Usuario, Rol)}.
+     *
+     * @param objetivo usuario cuyos datos se cambiarian
+     * @throws OperacionNoPermitidaException R6: el objetivo es el
+     *                                       superadministrador y quien llama
+     *                                       no es el
+     */
+    public void verificarEdicion(Usuario objetivo) {
+        if (!esSuperadmin(objetivo)) {
+            return;
+        }
+
+        // R6. Se compara por id y no por la marca de quien llama: dos
+        // superadmins no se editan entre si, igual que R4 no deja que uno
+        // desactive al otro.
+        if (usuarioAutenticado.id().equals(objetivo.getIdUsuario())) {
+            return;
+        }
+
+        throw new OperacionNoPermitidaException(
+                "El usuario " + objetivo.getNombreUsuario()
+                        + " es el superadministrador: solo el puede cambiar sus datos");
     }
 
     /**

@@ -23,6 +23,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioCambioClaveRequest;
+import sv.edu.ues.fmp.flora.dto.request.UsuarioCambioCredencialesRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioCreationRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioLoginRequest;
 import sv.edu.ues.fmp.flora.dto.request.UsuarioUpdateRequest;
@@ -89,14 +90,17 @@ public class UsuarioController {
     }
 
     @Operation(summary = "Actualizar los datos de un usuario",
-            description = "No cambia la clave ni la bandera de estado: para eso está el PUT "
-                    + "/clave, y para dar de baja o reactivar están el DELETE y el "
-                    + "PATCH /activar.")
+            description = "Cambia el nombre y el apellido, y nada más. El correo y el nombre "
+                    + "de usuario son autoservicio del dueño (PUT /credenciales): un "
+                    + "administrador no los reescribe en una cuenta ajena. Tampoco cambia la "
+                    + "clave ni la bandera de estado: para eso están el PUT /clave, el DELETE "
+                    + "y el PATCH /activar. A los datos del superadministrador solo los cambia "
+                    + "él mismo.")
     @ApiResponse(responseCode = "200", description = "Usuario actualizado")
     @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "403",
+            description = "El objetivo es el superadministrador y quien llama no es él")
     @ApiResponse(responseCode = "404", description = "No existe un usuario con ese id")
-    @ApiResponse(responseCode = "409",
-            description = "Ya existe otro usuario con ese correo o nombre de usuario")
     @PreAuthorize("hasAuthority('USUARIO_GESTIONAR')")
     @PutMapping("/{id}")
     public ResponseEntity<UsuarioResponse> actualizar(
@@ -173,6 +177,52 @@ public class UsuarioController {
 
         usuarioService.cambiarClave(id, request);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Cambiar el correo y el nombre de usuario propios",
+            description = "Autoservicio, como el PUT /clave: el id de la ruta tiene que ser el "
+                    + "del usuario del token (si no, 403) y además hay que enviar la clave "
+                    + "actual. Es la única vía que escribe el correo y el nombre de usuario "
+                    + "después de la creación; un administrador no puede cambiárselos a otra "
+                    + "cuenta por el PUT de edición.")
+    @ApiResponse(responseCode = "200", description = "Credenciales actualizadas")
+    @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "401", description = "La clave actual no es correcta, o falta el token")
+    @ApiResponse(responseCode = "403", description = "El id no es el del usuario autenticado")
+    @ApiResponse(responseCode = "404", description = "No existe un usuario con ese id")
+    @ApiResponse(responseCode = "409",
+            description = "Ya existe otro usuario con ese correo o nombre de usuario")
+    /*
+     * El correo y el nombre de usuario salieron del PUT de edicion y llegaron
+     * aqui, con el mismo guard de propiedad que la clave.
+     *
+     * El motivo es una suplantacion, no una preferencia de diseño:
+     * POST /api/usuarios/recuperar-clave es publico y resuelve la cuenta por su
+     * correo, asi que mientras un administrador pudo reescribir el correo de
+     * otra cuenta, pudo tambien apuntarlo a su propio buzon, pedir el
+     * restablecimiento y quedarse con ella. Con la cuenta del
+     * superadministrador eso saltaba por encima de SEG-H09 entero: R4 impedia
+     * desactivarlo, pero nadie impedia suplantarlo.
+     *
+     * Y por eso el arreglo no es solo proteger al superadmin: ninguna cuenta
+     * tiene por que poder ser repuntada por un tercero, asi que el cambio es
+     * autoservicio para todas.
+     *
+     * Misma mecanica que cambiarClave: la comparacion con authentication.name
+     * --el sub del token, que es el id-- va en @PreAuthorize para que un
+     * intento sobre el id de otro se corte antes de tocar la base y antes de
+     * comparar ninguna clave. Y se sigue pidiendo la clave actual: el token
+     * prueba que hay una sesion, la clave prueba que esta la persona, que es lo
+     * que corresponde para la operacion que decide a donde llega el enlace de
+     * recuperacion.
+     */
+    @PreAuthorize("#id.toString() == authentication.name")
+    @PutMapping("/{id}/credenciales")
+    public ResponseEntity<UsuarioResponse> cambiarCredenciales(
+            @PathVariable Long id,
+            @Valid @RequestBody UsuarioCambioCredencialesRequest request) {
+
+        return ResponseEntity.ok(usuarioService.cambiarCredenciales(id, request));
     }
 
     /**

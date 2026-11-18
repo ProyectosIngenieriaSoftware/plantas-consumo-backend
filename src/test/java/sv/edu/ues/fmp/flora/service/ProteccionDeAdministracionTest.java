@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -30,7 +32,7 @@ import sv.edu.ues.fmp.flora.entity.UsuarioRol;
 import sv.edu.ues.fmp.flora.entity.enums.UsuarioRolId;
 
 /**
- * Red de regresion de SEG-H09: las cinco reglas que protegen el acceso de
+ * Red de regresion de SEG-H09: las seis reglas que protegen el acceso de
  * administracion.
  *
  * <h2>Que fija</h2>
@@ -39,6 +41,23 @@ import sv.edu.ues.fmp.flora.entity.enums.UsuarioRolId;
  * ni quitarse su propio rol (SEG-148 y SEG-149)--, que un administrador normal
  * no pueda con otro administrador, que al superadministrador no lo toque nadie
  * y que ninguna operacion deje el sistema con cero administradores activos.
+ *
+ * <h2>R6, la via de edicion</h2>
+ * R1-R5 cubrian la baja logica, el rol y la baja del rol: las vias que quitan
+ * el acceso. La <strong>edicion</strong> --{@code PUT /api/usuarios/{id}}-- no
+ * pasaba por ninguna, y por ahi un administrador normal cambiaba los datos del
+ * superadministrador. No lo desactivaba --ese campo no esta en el DTO-- pero
+ * mientras el DTO llevo el {@code correo}, reescribirlo y pedir el
+ * {@code recuperar-clave} publico entregaba la cuenta: una suplantacion que no
+ * tocaba ninguna de las cinco reglas. R6 cierra el lado de "quien puede
+ * editar a quien"; el otro lado --que el correo y el nombre de usuario ya no
+ * se editen desde una cuenta ajena-- lo cubre
+ * {@code CredencialesAutoservicioTest}.
+ * <p>
+ * Junto con R6 va la marca: {@code es_superadmin} se expone en
+ * {@code UsuarioResponse} para que el frontend pueda bloquear la fila
+ * protegida, y hay una prueba de que no se puede escribir por el cuerpo de
+ * ninguna de las dos vias que guardan un usuario.
  * <p>
  * Esa ultima parte se comprueba por las tres vias que llevan al mismo estado:
  * quitar el rol, dar de baja al usuario y --la que se cerro despues-- dar de
@@ -301,6 +320,179 @@ class ProteccionDeAdministracionTest {
 
         assertTrue(recargar(otroSuperadmin).getActivo(),
                 "la cuenta del superadministrador no se desactiva");
+    }
+
+    // ---------- R6: a los datos del superadmin solo los cambia el ----------
+
+    /**
+     * La via que no pasaba por ninguna regla: {@code PUT /api/usuarios/{id}}.
+     * <p>
+     * Un administrador normal no podia ponerle {@code activo = false} al
+     * superadministrador --{@code UsuarioUpdateRequest} no tiene ese campo--
+     * pero si reescribirle los datos, y mientras el DTO llevaba {@code correo}
+     * eso bastaba para quedarse con la cuenta: el {@code recuperar-clave}
+     * publico resuelve por correo. Se cerro por los dos lados; esta prueba fija
+     * el de R6.
+     */
+    @Test
+    void administrador_intentaEditarAlSuperadmin_devuelve403YNoCambiaNada() throws Exception {
+        String nombresAntes = otroSuperadmin.getNombres();
+
+        mockMvc.perform(put("/api/usuarios/" + otroSuperadmin.getIdUsuario())
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(administrador, USUARIO_GESTIONAR))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoDeEdicion("Intruso", "Reescrito")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.estado").value(403))
+                .andExpect(jsonPath("$.error").value("Prohibido"))
+                .andExpect(jsonPath("$.mensaje").exists())
+                .andExpect(jsonPath("$.trace").doesNotExist());
+
+        assertEquals(nombresAntes, recargar(otroSuperadmin).getNombres(),
+                "los datos del superadministrador no debian cambiar");
+    }
+
+    /** Ni el gestor de usuarios, que es quien tiene el permiso del endpoint. */
+    @Test
+    void gestor_intentaEditarAlSuperadmin_devuelve403() throws Exception {
+        mockMvc.perform(put("/api/usuarios/" + otroSuperadmin.getIdUsuario())
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(gestor, USUARIO_GESTIONAR))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoDeEdicion("Intruso", "Reescrito")))
+                .andExpect(status().isForbidden());
+
+        assertEquals("Otro", recargar(otroSuperadmin).getNombres(),
+                "los datos del superadministrador no debian cambiar");
+    }
+
+    /**
+     * R6 compara por id, no por la marca de quien llama: un superadministrador
+     * no edita a otro, igual que R4 no le deja desactivarlo.
+     */
+    @Test
+    void superadmin_intentaEditarAOtroSuperadmin_devuelve403() throws Exception {
+        mockMvc.perform(put("/api/usuarios/" + otroSuperadmin.getIdUsuario())
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(superadmin, USUARIO_GESTIONAR))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoDeEdicion("Intruso", "Reescrito")))
+                .andExpect(status().isForbidden());
+
+        assertEquals("Otro", recargar(otroSuperadmin).getNombres(),
+                "los datos del superadministrador no debian cambiar");
+    }
+
+    /**
+     * El contrapeso de R6: el superadministrador si se edita a si mismo. Sin
+     * esta prueba, una regla que prohibiera tambien eso dejaria la clase en
+     * verde y la cuenta no podria corregir su propio nombre --y no hay nadie
+     * por encima a quien pedirselo--.
+     */
+    @Test
+    void superadmin_seEditaASiMismo_devuelve200YCambia() throws Exception {
+        mockMvc.perform(put("/api/usuarios/" + superadmin.getIdUsuario())
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(superadmin, USUARIO_GESTIONAR))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoDeEdicion("Nombre", "Corregido")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nombres").value("Nombre"))
+                .andExpect(jsonPath("$.apellidos").value("Corregido"));
+
+        assertEquals("Nombre", recargar(superadmin).getNombres(),
+                "el superadministrador debia poder corregir su propio nombre");
+    }
+
+    /** Editar a cualquiera que no sea superadmin sigue siendo normal. */
+    @Test
+    void administrador_editaAUnUsuarioComun_devuelve200() throws Exception {
+        mockMvc.perform(put("/api/usuarios/" + comun.getIdUsuario())
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(administrador, USUARIO_GESTIONAR))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoDeEdicion("Editado", "PorAdmin")))
+                .andExpect(status().isOk());
+
+        assertEquals("Editado", recargar(comun).getNombres(),
+                "la edicion de un usuario comun no debia bloquearse");
+    }
+
+    /**
+     * Mismo criterio que la baja: R6 se evalua despues de encontrar al usuario,
+     * asi que un id inexistente sigue siendo 404 y no 403.
+     */
+    @Test
+    void editarUnIdInexistente_sigueDando404() throws Exception {
+        mockMvc.perform(put("/api/usuarios/999999")
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(administrador, USUARIO_GESTIONAR))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cuerpoDeEdicion("Nadie", "NoExiste")))
+                .andExpect(status().isNotFound());
+    }
+
+    // ---------- La marca es de solo lectura ----------
+
+    /**
+     * {@code es_superadmin} sale en la respuesta --el frontend la necesita para
+     * bloquear la fila protegida-- y no entra por ningun cuerpo.
+     * <p>
+     * Se comprueba por las dos vias que escriben un usuario: la edicion y la
+     * creacion. Las dos reciben {@code "esSuperadmin": true} y las dos tienen
+     * que dejar la marca en false: ningun DTO de entrada la lleva, asi que
+     * Jackson la descarta en silencio ({@code FAIL_ON_UNKNOWN_PROPERTIES} esta
+     * desactivado). Si algun dia alguien la agregara a un DTO, esta prueba es
+     * la que se pone roja.
+     */
+    @Test
+    void laMarcaDeSuperadmin_seLeeEnLaRespuestaYNoSeEscribePorElCuerpo() throws Exception {
+        // 1. Se lee, y distingue al superadmin del que no lo es.
+        mockMvc.perform(get("/api/usuarios/" + superadmin.getIdUsuario())
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(administrador, USUARIO_GESTIONAR)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.esSuperadmin").value(true));
+
+        mockMvc.perform(get("/api/usuarios/" + comun.getIdUsuario())
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(administrador, USUARIO_GESTIONAR)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.esSuperadmin").value(false));
+
+        // 2. No se escribe por el PUT de edicion.
+        mockMvc.perform(put("/api/usuarios/" + comun.getIdUsuario())
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(administrador, USUARIO_GESTIONAR))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nombres": "Aspirante",
+                                  "apellidos": "ASuperadmin",
+                                  "esSuperadmin": true,
+                                  "es_superadmin": true,
+                                  "activo": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.esSuperadmin").value(false))
+                // De paso: activo tampoco entra por esta via.
+                .andExpect(jsonPath("$.activo").value(true));
+
+        assertFalse(recargar(comun).getEsSuperadmin(),
+                "la marca no debia poder escribirse por el cuerpo de la edicion");
+        assertTrue(recargar(comun).getActivo(),
+                "activo no debia poder escribirse por el cuerpo de la edicion");
+
+        // 3. Ni por el POST de creacion.
+        long n = SECUENCIA.incrementAndGet();
+        mockMvc.perform(post("/api/usuarios")
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(administrador, USUARIO_GESTIONAR))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nombres": "Nuevo",
+                                  "apellidos": "ConMarca",
+                                  "correo": "seg.h09.marca.%d@prueba.local",
+                                  "nombreUsuario": "seg.h09.marca.%d",
+                                  "clave": "DePrueba1#",
+                                  "esSuperadmin": true
+                                }
+                                """.formatted(n, n)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.esSuperadmin").value(false));
     }
 
     // ---------- R5: nunca cero administradores activos ----------
@@ -642,6 +834,19 @@ class ProteccionDeAdministracionTest {
 
     private static String rutaDeQuitar(Usuario usuario, Rol rol) {
         return "/api/usuario-roles/usuario/" + usuario.getIdUsuario() + "/rol/" + rol.getIdRol();
+    }
+
+    /**
+     * El cuerpo de {@code PUT /api/usuarios/{id}}: nombres y apellidos, los dos
+     * unicos campos que quedaron en {@code UsuarioUpdateRequest}. El correo y
+     * el nombre de usuario salieron de ahi --son autoservicio del dueño-- y por
+     * eso no estan aqui: si volvieran al DTO, este metodo seria el sitio donde
+     * se notaria.
+     */
+    private static String cuerpoDeEdicion(String nombres, String apellidos) {
+        return """
+                { "nombres": "%s", "apellidos": "%s" }
+                """.formatted(nombres, apellidos);
     }
 
     private static String cuerpoDeAsignacion(Usuario usuario, Rol rol) {

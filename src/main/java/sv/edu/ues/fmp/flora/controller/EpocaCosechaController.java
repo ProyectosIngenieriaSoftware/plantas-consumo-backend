@@ -31,14 +31,27 @@ public class EpocaCosechaController {
     private final EpocaCosechaService epocaCosechaService;
 
     /**
-     * Listado administrativo. Entra por el id de la parte comestible, pero
+     * Las epocas de cosecha de una parte comestible. Abierto, como el resto de
+     * la consulta del catalogo.
+     *
+     * <h2>Por que ya no pide ESPECIE_CONSULTAR</h2>
+     * Entra por el id de la parte comestible, igual que
+     * {@code GET /api/preparaciones-consumo/parte/{id}}, pero
      * --al contrario que sus hermanos-- nunca pregunto por el estado de la
      * ficha de la que cuelga esa parte, asi que sin permiso devolvia las epocas
-     * de los borradores a quien probara numeros. Se cierra con el permiso en
-     * vez de con un 404 en el servicio porque la respuesta no confirma que
-     * exista ninguna epoca: la parte inexistente ya daba 404 antes.
+     * de los borradores a quien probara numeros. Se cerro con
+     * {@code ESPECIE_CONSULTAR} mientras le faltaba el filtro, y eso dejo al
+     * catalogo publico sin un sub-recurso de las fichas PUBLICADAS: era el
+     * unico listado de epocas, asi que un anonimo no podia pintar la epoca de
+     * cosecha de una especie publicada.
+     * <p>
+     * Ahora {@code EpocaCosechaServiceImpl.listarPorParte} aplica
+     * {@code VisibilidadDeEspecie} como sus hermanos: la epoca de una ficha
+     * PUBLICADA se ve sin token, y la de una BORRADOR o EN_REVISION responde
+     * 404 a quien no traiga {@code ESPECIE_CONSULTAR}. La decision vive en la
+     * logica y no en la matriz por el 404: un 403 sobre el id de una parte
+     * confirmaria que esta ocupado por una ficha sin publicar.
      */
-    @PreAuthorize("hasAuthority('ESPECIE_CONSULTAR')")
     @GetMapping
     public ResponseEntity<List<EpocaCosechaResponse>> listar(
             @RequestParam Long idEspecieParte,

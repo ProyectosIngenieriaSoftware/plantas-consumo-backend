@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,15 +15,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.persistence.EntityManager;
-import sv.edu.ues.fmp.flora.config.SiembraDeFichas.Ficha;
 import sv.edu.ues.fmp.flora.dto.response.UsuarioResponse;
-import sv.edu.ues.fmp.flora.entity.enums.EstadoPublicacion;
 import sv.edu.ues.fmp.flora.service.EmailService;
 import sv.edu.ues.fmp.flora.service.JwtService;
 
 /**
- * Pruebas de los cinco listados <strong>globales</strong> de contenido de
+ * Pruebas de los cuatro listados <strong>globales</strong> de contenido de
  * especie: los que no reciben el id de ninguna ficha.
  *
  * <h2>Lo que estaba mal</h2>
@@ -33,31 +29,39 @@ import sv.edu.ues.fmp.flora.service.JwtService;
  * {@link EspecieSubRecursosVisibilidadTest}) y las que entran por el id de un
  * hijo suyo ({@link EspecieRutasPlanasVisibilidadTest}), quedaban los listados
  * que no entran por ningun id: un {@code findAll()} de preparaciones, dos de
- * parte-beneficio, el cruce por nutriente y el de epocas de cosecha. Ninguno
- * miraba el estado de la ficha de la que cuelga cada renglon, asi que sin token
- * devolvian tambien el contenido de los BORRADOR y EN_REVISION: justo el que
- * las rutas por padre ya habian dejado de mostrar.
+ * parte-beneficio y el cruce por nutriente. Ninguno miraba el estado de la
+ * ficha de la que cuelga cada renglon, asi que sin token devolvian tambien el
+ * contenido de los BORRADOR y EN_REVISION: justo el que las rutas por padre ya
+ * habian dejado de mostrar.
  *
  * <h2>Por que aqui es 401 y no 404</h2>
  * En las rutas planas la respuesta tenia que ser 404 porque un 403 sobre el id
  * de una imagen confirmaba que esa imagen existe. Un listado no se pide por el
- * id de nada: cortarlo en el filtro no delata ninguna fila, asi que estos cinco
- * se cierran en la matriz de {@link SecurityConfig} --quedan fuera de
+ * id de nada: cortarlo en el filtro no delata ninguna fila, asi que estos
+ * cuatro se cierran en la matriz de {@link SecurityConfig} --quedan fuera de
  * {@code CATALOGO_PUBLICO}, recortados por {@code LISTADOS_GLOBALES}-- mas un
  * {@code @PreAuthorize} en el metodo. De ahi los tres codigos que se afirman:
  * 401 sin token, 403 con token sin el permiso y 200 con
  * {@code ESPECIE_CONSULTAR}.
  *
- * <h2>Por que casi ninguna prueba necesita datos</h2>
+ * <h2>El quinto se fue, y por que</h2>
+ * {@code GET /api/epocas-cosecha} estaba aqui y ya no: era el <strong>unico
+ * listado de epocas de cosecha</strong>, asi que cerrarlo con el permiso dejo
+ * al catalogo publico sin un sub-recurso de las fichas PUBLICADAS --un anonimo
+ * no podia pintar la epoca de cosecha de una especie publicada--. Y no era un
+ * listado global de verdad: recibe el id de una parte comestible, igual que
+ * {@code /api/preparaciones-consumo/parte/{id}}. Lo que le faltaba era el
+ * filtro, no el permiso: {@code EpocaCosechaServiceImpl.listarPorParte} era el
+ * unico hermano sin {@code VisibilidadDeEspecie} y ahora lo aplica. Esta clase
+ * conserva una sola afirmacion sobre esa ruta --que el anonimo <em>llega</em>--
+ * y lo que se ve o no se ve por ella lo cubre
+ * {@link EspecieRutasPlanasVisibilidadTest}, con sus hermanas de id de padre.
+ *
+ * <h2>Por que ninguna prueba necesita datos</h2>
  * Un listado contesta 200 con lista vacia, asi que no hace falta sembrar nada
- * para medir el guard. La unica excepcion es {@code GET /api/epocas-cosecha},
- * que exige el id de una parte comestible y responde 404 si no existe: esa
- * prueba buscaba una parte en la base y se saltaba con
- * {@code Assumptions.assumeTrue} cuando no habia ninguna, de modo que en una
- * base limpia el 200 con ESPECIE_CONSULTAR no lo fijaba nadie. Ahora el
- * {@code @BeforeEach} siembra una ficha completa con {@link SiembraDeFichas}
- * --que trae su parte comestible y su epoca de cosecha-- y la prueba usa esa:
- * corre siempre, con los datos que haya.
+ * para medir el guard. La excepcion era {@code GET /api/epocas-cosecha}, que
+ * exige el id de una parte comestible y responde 404 si no existe; con esa ruta
+ * fuera, la siembra que la sostenia se fue con ella.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -80,10 +84,7 @@ class ListadosGlobalesDeEspecieTest {
             "/api/aportes-nutricionales/nutriente/" + ID_INEXISTENTE;
     private static final String EPOCAS = "/api/epocas-cosecha";
 
-    /**
-     * Los cuatro que no necesitan parametros. El quinto --{@code EPOCAS}--
-     * lleva un {@code @RequestParam} obligatorio y va aparte.
-     */
+    /** Los cuatro cerrados. Ninguno necesita parametros. */
     private static final List<String> SIN_PARAMETROS = List.of(
             PREPARACIONES,
             PARTE_BENEFICIOS,
@@ -96,25 +97,8 @@ class ListadosGlobalesDeEspecieTest {
     @Autowired
     private JwtService jwtService;
 
-    @Autowired
-    private EntityManager entityManager;
-
     @MockitoBean
     private EmailService emailService;
-
-    /**
-     * La ficha que usa el listado de epocas. Se siembra PUBLICADA porque lo
-     * que mide la prueba es el guard de la ruta, no la visibilidad: con la
-     * ficha publicada el 200 no depende de que el servicio deje ver o no el
-     * contenido de una ficha en preparacion, que es lo que prueban
-     * {@link EspecieVisibilidadPublicaTest} y sus hermanas.
-     */
-    private Ficha ficha;
-
-    @BeforeEach
-    void sembrar() {
-        ficha = new SiembraDeFichas(entityManager).sembrar(EstadoPublicacion.PUBLICADA);
-    }
 
     private String tokenCon(String... permisos) {
         UsuarioResponse usuario = UsuarioResponse.builder()
@@ -140,19 +124,6 @@ class ListadosGlobalesDeEspecieTest {
         }
     }
 
-    /**
-     * El parametro obligatorio va puesto a proposito. Sin el la respuesta seria
-     * 401 igual --el filtro corre antes de que Spring MVC resuelva los
-     * argumentos-- pero la prueba dejaria de distinguir el corte de seguridad
-     * de un 400 por el parametro que falta.
-     */
-    @Test
-    void listadoDeEpocas_sinToken_devuelve401() throws Exception {
-        mockMvc.perform(get(EPOCAS).param("idEspecieParte", ID_INEXISTENTE))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.estado").value(401));
-    }
-
     // ---------- Con token, pero sin el permiso ----------
 
     @Test
@@ -163,12 +134,6 @@ class ListadosGlobalesDeEspecieTest {
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.estado").value(403));
         }
-
-        mockMvc.perform(get(EPOCAS)
-                        .param("idEspecieParte", ID_INEXISTENTE)
-                        .header(HttpHeaders.AUTHORIZATION, tokenCon(OTRO_PERMISO)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.estado").value(403));
     }
 
     // ---------- Con ESPECIE_CONSULTAR ----------
@@ -182,35 +147,10 @@ class ListadosGlobalesDeEspecieTest {
         }
     }
 
-    @Test
-    void listadoDeEpocas_conEspecieConsultar_devuelve200() throws Exception {
-        mockMvc.perform(get(EPOCAS)
-                        .param("idEspecieParte", ficha.parte().getIdEspecieParte().toString())
-                        .header(HttpHeaders.AUTHORIZATION, tokenCon(ESPECIE_CONSULTAR)))
-                .andExpect(status().isOk())
-                // La parte sembrada trae una epoca de cosecha, asi que el 200
-                // no es el de la lista vacia: la ruta devolvio contenido.
-                .andExpect(jsonPath("$[0]").exists());
-    }
-
-    /**
-     * La misma afirmacion sin necesidad de ninguna fila: con el permiso, una
-     * parte que no existe da 404 y no 403. El 404 sale del servicio, o sea que
-     * el guard dejo pasar; es el razonamiento de
-     * {@link AutorizacionPorPermisoTest}.
-     */
-    @Test
-    void listadoDeEpocas_conEspecieConsultar_atraviesaElGuard() throws Exception {
-        mockMvc.perform(get(EPOCAS)
-                        .param("idEspecieParte", ID_INEXISTENTE)
-                        .header(HttpHeaders.AUTHORIZATION, tokenCon(ESPECIE_CONSULTAR)))
-                .andExpect(status().isNotFound());
-    }
-
     // ---------- Lo que seguia abierto sigue abierto ----------
 
     /**
-     * El recorte de {@code CATALOGO_PUBLICO} toca cinco rutas exactas, no las
+     * El recorte de {@code CATALOGO_PUBLICO} toca cuatro rutas exactas, no las
      * familias enteras. Los hermanos de estos listados que si reciben el id del
      * padre --y que por eso ya filtran por el estado de la ficha dentro del
      * servicio-- tienen que seguir atendiendo al anonimo. Lo que se mide es que
@@ -226,6 +166,14 @@ class ListadosGlobalesDeEspecieTest {
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(get(EPOCAS + "/" + ID_INEXISTENTE))
+                .andExpect(status().isNotFound());
+
+        // El listado de epocas, el que salio de LISTADOS_GLOBALES. El 404 es la
+        // respuesta del servicio a una parte que no existe: el anonimo llego al
+        // metodo, que es lo que esta prueba fija. Que la parte de una ficha sin
+        // publicar devuelva ese mismo 404 lo comprueba
+        // EspecieRutasPlanasVisibilidadTest.
+        mockMvc.perform(get(EPOCAS).param("idEspecieParte", ID_INEXISTENTE))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(get("/api/aportes-nutricionales/" + ID_INEXISTENTE))
