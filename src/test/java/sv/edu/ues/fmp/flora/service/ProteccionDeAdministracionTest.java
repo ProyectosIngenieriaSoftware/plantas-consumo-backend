@@ -1,5 +1,6 @@
 package sv.edu.ues.fmp.flora.service;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,8 +33,23 @@ import sv.edu.ues.fmp.flora.entity.UsuarioRol;
 import sv.edu.ues.fmp.flora.entity.enums.UsuarioRolId;
 
 /**
- * Red de regresion de SEG-H09: las seis reglas que protegen el acceso de
+ * Red de regresion de SEG-H09: las siete reglas que protegen el acceso de
  * administracion.
+ *
+ * <h2>R7, los roles de sistema</h2>
+ * R2, R3 y R5 preguntan si un rol <em>se llama</em> ADMINISTRADOR, y el nombre
+ * de un rol lo escribia {@code PUT /api/roles/{id}} sin pasar por ninguna
+ * regla: renombrarlo apagaba las tres de una peticion, y
+ * {@code /api/rol-permisos} permitia ademas vaciarlo de permisos y degradar a
+ * todos los administradores a la vez. R7 se ancla en {@code rol.es_sistema}
+ * ({@code V20}) y tiene dos caras: <strong>R7a</strong>, de autoridad --solo el
+ * superadministrador muta un rol de sistema, 403-- y <strong>R7b</strong>,
+ * estructural --su nombre y su fila no los toca nadie, 409--.
+ * <p>
+ * Esta clase cubre R7 por la via de la baja del rol, que es la que ya tenia
+ * pruebas y cuyos codigos cambian. Las demas vias --editar, renombrar,
+ * reactivar, permisos-- y los contrapesos del rol personalizado estan en
+ * {@code RolDeSistemaTest}.
  *
  * <h2>Que fija</h2>
  * Que con {@code USUARIO_GESTIONAR} ya no alcance para volverse administrador
@@ -63,7 +79,9 @@ import sv.edu.ues.fmp.flora.entity.enums.UsuarioRolId;
  * quitar el rol, dar de baja al usuario y --la que se cerro despues-- dar de
  * baja el rol ADMINISTRADOR mismo con {@code DELETE /api/roles/{id}}, que no
  * toca ninguna fila de {@code usuario_rol} y aun asi degrada a todos los
- * administradores a la vez.
+ * administradores a la vez. De esas tres, la tercera la gobierna ahora R7, que
+ * la cierra del todo en vez de condicionarla al numero de administradores; la
+ * rama de usuarios de R5 sigue siendo de R5.
  * <p>
  * Cada bloqueo se comprueba por dos lados: el codigo de respuesta y que la
  * operacion <strong>no se ejecuto</strong>. Lo segundo es lo que no se puede
@@ -529,22 +547,42 @@ class ProteccionDeAdministracionTest {
                 "el ultimo administrador activo no debia quedar desactivado");
     }
 
-    // ---------- R5 por la via del rol: DELETE /api/roles/{id} ----------
+    // ---------- La via del rol: DELETE /api/roles/{id} ----------
+    //
+    // Esta seccion la gobernaba R5 y ahora la gobierna R7, que es mas fuerte.
+    // Las tres pruebas siguen midiendo la misma via --desactivar el rol
+    // ADMINISTRADOR degrada a todos los que lo tienen asignado sin tocar
+    // usuario_rol-- pero el motivo del corte, y en un caso el codigo, cambian:
+    //
+    //   antes                              ahora
+    //   ------------------------------     --------------------------------
+    //   superadmin, con admins activos     409 R5   ->  409 R7b (rol de sistema)
+    //   admin normal                       409 R5   ->  403 R7a (no es superadmin)
+    //   superadmin, sin admins activos     204      ->  409 R7b (ya no se permite)
+    //
+    // El tercero es el endurecimiento real: la salvedad del invariante de R5
+    // --"si ya habia cero administradores, la baja no es la que causa el
+    // problema"-- dejaba pasar la operacion, y ahora un rol de sistema no se da
+    // de baja haya o no administradores. R5 sigue intacta en su rama de
+    // usuarios; ver laRamaDeUsuariosDeR5_sigueBloqueandoAunqueR7GobierneElRol.
 
     /**
-     * La sexta via a "cero administradores": no se le quita el rol a nadie ni
-     * se da de baja a ningun usuario, se desactiva el rol ADMINISTRADOR y con
-     * eso deja de otorgar nada a los que lo tienen asignado. Es la unica que no
-     * pasa por {@code /api/usuarios} ni por {@code /api/usuario-roles}, asi que
-     * ninguna de las pruebas de arriba la cubria.
+     * Ni el superadministrador da de baja un rol de sistema (R7b).
      * <p>
-     * Como la siembra deja dos administradores activos, aqui no hay que dejar
-     * uno solo: la baja del rol se los lleva a todos de una vez, de modo que
-     * cualquier administrador activo basta para que el estado resultante sea
-     * cero.
+     * El 409 y no un 403 es lo que distingue a R7b de R7a: al
+     * superadministrador no le falta autoridad --la tiene sobre los roles de
+     * sistema, por eso puede cambiarles los permisos y la descripcion-- sino
+     * que la operacion no existe para esta clase de rol. Un 403 le diria que no
+     * tiene permisos, que es falso.
+     * <p>
+     * Se afirma el mensaje y no solo el codigo: hoy hay dos reglas que
+     * contestan 409 por esta misma ruta --R7b por ser de sistema y R5 por el
+     * invariante de administradores-- y la prueba tiene que fijar cual de las
+     * dos corto. Si R7b se cayera, R5 contestaria el mismo 409 con otro texto y
+     * una prueba que solo mirara el codigo seguiria verde.
      */
     @Test
-    void desactivarElRolAdministradorConAdministradoresActivos_devuelve409YElRolSigueActivo()
+    void superadmin_intentaDarDeBajaUnRolDeSistema_devuelve409YElRolSigueActivo()
             throws Exception {
 
         assertTrue(administradoresActivos() > 0,
@@ -554,7 +592,8 @@ class ProteccionDeAdministracionTest {
                         .header(HttpHeaders.AUTHORIZATION, tokenDe(superadmin, USUARIO_GESTIONAR)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.estado").value(409))
-                .andExpect(jsonPath("$.mensaje").exists())
+                .andExpect(jsonPath("$.mensaje").value(
+                        containsString("rol de sistema")))
                 .andExpect(jsonPath("$.trace").doesNotExist());
 
         assertTrue(recargar(rolAdministrador).getActivo(),
@@ -562,39 +601,104 @@ class ProteccionDeAdministracionTest {
     }
 
     /**
-     * Y tampoco lo puede el superadministrador, que es lo que separa este 409
-     * de un 403: no es una cuestion de quien llama --el superadmin si puede
-     * administrar el catalogo de roles-- sino del estado al que llevaria la
-     * operacion. La prueba de arriba ya usa el token del superadmin; esta fija
-     * el otro lado, el administrador normal, para que el dia que se agregue la
-     * restriccion de "solo el superadmin" se vea cual de las dos cambia.
+     * Y a un administrador normal lo corta antes R7a, con 403.
+     *
+     * <h2>Por que el token lleva USUARIO_GESTIONAR</h2>
+     * Porque sin el, el 403 lo daria el {@code @PreAuthorize} de clase de
+     * {@code RolController} y la prueba no mediria nada de SEG-H09: seria la
+     * prueba de que un endpoint protegido pide su permiso, que ya tiene
+     * {@code AutorizacionPorPermisoTest}. Con el permiso puesto, la peticion
+     * atraviesa method-security y llega al servicio, asi que el 403 solo puede
+     * venir de R7a.
+     *
+     * <h2>Por que 403 y no el 409 de antes</h2>
+     * R7a se evalua antes que R7b y que R5: la primera pregunta es si quien
+     * llama puede tocar este rol. Antes de R7 no habia ninguna restriccion de
+     * "quien" sobre el catalogo de roles y los dos --superadmin y
+     * administrador-- recibian el mismo 409 del invariante.
      */
     @Test
-    void administrador_intentaDesactivarElRolAdministrador_devuelve409() throws Exception {
+    void administrador_intentaDarDeBajaUnRolDeSistema_devuelve403() throws Exception {
         mockMvc.perform(delete("/api/roles/" + rolAdministrador.getIdRol())
                         .header(HttpHeaders.AUTHORIZATION, tokenDe(administrador, USUARIO_GESTIONAR)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.estado").value(409));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.estado").value(403))
+                .andExpect(jsonPath("$.error").value("Prohibido"))
+                .andExpect(jsonPath("$.mensaje").value(
+                        containsString("superadministrador")));
 
         assertTrue(recargar(rolAdministrador).getActivo(),
                 "el rol ADMINISTRADOR no debia quedar desactivado");
     }
 
     /**
-     * La salvedad del invariante: si no hay ningun administrador activo, la
-     * baja del rol no es la que deja el sistema sin administracion --ya estaba
-     * asi-- y la operacion sigue siendo valida. Sin esta prueba, un 409
-     * incondicional sobre el rol ADMINISTRADOR pasaria igual las dos de arriba.
+     * El endurecimiento: R7b bloquea la baja haya o no administradores activos.
+     * <p>
+     * Esta prueba afirmaba 204. La salvedad del invariante de R5 --si ya habia
+     * cero administradores activos, la baja del rol no es la operacion que
+     * causa el problema-- hacia que en ese estado la baja se permitiera, y con
+     * ella el rol ADMINISTRADOR quedaba inactivo: a partir de ahi
+     * {@code esElRolDeAdministrador} seguia reconociendolo por el nombre pero
+     * {@code contarUsuariosActivosConRolActivo} devolvia cero para siempre, y
+     * recuperar la administracion pedia SQL. Ahora no se permite nunca, que es
+     * lo que pide un rol de sistema.
+     * <p>
+     * La siembra se deja igual que antes --sin administradores activos-- para
+     * que la prueba siga midiendo exactamente ese escenario y no otro: el 409
+     * que afirma no puede venir de R5, porque en este estado R5 no objeta.
      */
     @Test
-    void desactivarElRolAdministradorSinAdministradoresActivos_devuelve204() throws Exception {
+    void darDeBajaUnRolDeSistemaSinAdministradoresActivos_devuelve409() throws Exception {
         dejarSinAdministradoresActivos();
 
         mockMvc.perform(delete("/api/roles/" + rolAdministrador.getIdRol())
                         .header(HttpHeaders.AUTHORIZATION, tokenDe(superadmin, USUARIO_GESTIONAR)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.mensaje").value(
+                        containsString("rol de sistema")));
 
-        assertFalse(recargar(rolAdministrador).getActivo(), "el rol debia quedar desactivado");
+        assertTrue(recargar(rolAdministrador).getActivo(),
+                "un rol de sistema no debia quedar desactivado en ningun escenario");
+    }
+
+    /**
+     * El contrapeso de que R7 no absorbio a R5: la rama de <strong>usuarios</strong>
+     * del invariante sigue bloqueando por su cuenta.
+     * <p>
+     * Hace falta decirlo en una prueba porque la rama de rol de R5
+     * --{@code verificarDesactivacionDeRol}-- quedo inalcanzable para el rol
+     * ADMINISTRADOR: R7b corta antes. Si alguien leyera eso como "R5 ya no hace
+     * nada" y la quitara, el sistema volveria a poder quedarse sin
+     * administradores por la via del usuario, que es la que esta prueba fija.
+     * <p>
+     * Las dos afirmaciones van en el mismo metodo a proposito: juntas dicen que
+     * en el mismo escenario una via la corta R7b y la otra R5, con el mismo
+     * 409 pero por motivos distintos. La siembra va primero porque necesita un
+     * {@code flush} y despues del primer 409 la transaccion compartida ya esta
+     * marcada para rollback.
+     */
+    @Test
+    void laRamaDeUsuariosDeR5_sigueBloqueandoAunqueR7GobierneElRol() throws Exception {
+        dejarComoUnicoAdministradorActivo(administrador);
+
+        // Por la via del rol corta R7b: es un rol de sistema.
+        mockMvc.perform(delete("/api/roles/" + rolAdministrador.getIdRol())
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(superadmin, USUARIO_GESTIONAR)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.mensaje").value(
+                        containsString("rol de sistema")));
+
+        // Por la via del usuario sigue cortando R5: es el ultimo administrador
+        // activo. R7 no tiene nada que decir aqui, y tiene que seguir siendo
+        // asi.
+        mockMvc.perform(delete("/api/usuarios/" + administrador.getIdUsuario())
+                        .header(HttpHeaders.AUTHORIZATION, tokenDe(superadmin, USUARIO_GESTIONAR)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.mensaje").value(
+                        containsString("ultimo administrador activo")));
+
+        assertTrue(recargar(administrador).getActivo(),
+                "el ultimo administrador activo no debia quedar desactivado");
     }
 
     /** El otro contrapeso: dar de baja cualquier otro rol sigue siendo normal. */
@@ -744,7 +848,7 @@ class ProteccionDeAdministracionTest {
      * de {@code SiembraDeFichas} con los catalogos.
      */
     private Rol rolAdministrador() {
-        return entityManager.createQuery(
+        Rol rol = entityManager.createQuery(
                         "SELECT r FROM Rol r WHERE upper(r.nombre) = :nombre", Rol.class)
                 .setParameter("nombre", ADMINISTRADOR)
                 .getResultStream()
@@ -753,7 +857,17 @@ class ProteccionDeAdministracionTest {
                         .nombre(ADMINISTRADOR)
                         .descripcion("Rol de administracion")
                         .activo(true)
+                        .esSistema(true)
                         .build()));
+
+        // La marca se fuerza, no se asume. En florav1 la puso V20, pero si el
+        // rol se acabara de crear aqui --base recien armada-- o una base de
+        // desarrollo lo tuviera en false, las pruebas de R7 de abajo medirian
+        // lo contrario de lo que afirman y pasarian por el camino de "rol
+        // personalizado". Es la misma idea que SiembraDeFichas: la prueba no
+        // depende de lo que la base traiga. El rollback lo deshace.
+        rol.setEsSistema(true);
+        return rol;
     }
 
     /** Un rol nuevo, con nombre unico: {@code rol.nombre} no se puede repetir. */

@@ -88,12 +88,18 @@ public class RolController {
     }
 
     @Operation(summary = "Actualizar un rol",
-            description = "No cambia la bandera de estado: para dar de baja está el DELETE, "
-                    + "y para reactivar está el PATCH /activar.")
+            description = "No cambia la bandera de estado ni la marca esSistema: para dar de "
+                    + "baja está el DELETE, para reactivar el PATCH /activar, y la marca solo "
+                    + "se pone por migración. Un rol de sistema (esSistema=true) solo lo "
+                    + "edita el superadministrador, y su nombre no se puede cambiar ni "
+                    + "siquiera él: sí su descripción (SEG-H09 R7).")
     @ApiResponse(responseCode = "200", description = "Rol actualizado")
     @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "403", description = "Es un rol de sistema y quien llama no "
+            + "es el superadministrador")
     @ApiResponse(responseCode = "404", description = "No existe un rol con ese id")
-    @ApiResponse(responseCode = "409", description = "Ya existe otro rol con ese nombre")
+    @ApiResponse(responseCode = "409", description = "Ya existe otro rol con ese nombre, o es "
+            + "un rol de sistema y el cuerpo le cambia el nombre")
     @PutMapping("/{id}")
     public ResponseEntity<RolResponse> actualizar(
             @PathVariable Long id,
@@ -105,14 +111,18 @@ public class RolController {
     @Operation(summary = "Dar de baja lógica un rol",
             description = "No borra la fila: usuario_rol y rol_permiso la referencian por "
                     + "llave foránea y un DELETE físico rompería esas referencias. "
-                    + "El rol ADMINISTRADOR no se puede dar de baja mientras haya "
-                    + "administradores activos: desactivarlo se lo quitaría a todos a la "
-                    + "vez y dejaría el sistema sin administración (SEG-H09).")
+                    + "Un rol de sistema (esSistema=true) no se puede dar de baja: ni el "
+                    + "superadministrador. Desactivarlo se lo quitaría a todos los que lo "
+                    + "tienen a la vez —dejando el sistema sin administración, o sin "
+                    + "investigadores— y para retirarlo basta quitarle los permisos "
+                    + "(SEG-H09 R7).")
     @ApiResponse(responseCode = "400", description = "El id no es un valor positivo")
     @ApiResponse(responseCode = "204", description = "Rol desactivado")
+    @ApiResponse(responseCode = "403", description = "Es un rol de sistema y quien llama no "
+            + "es el superadministrador")
     @ApiResponse(responseCode = "404", description = "No existe un rol con ese id")
-    @ApiResponse(responseCode = "409", description = "Es el rol ADMINISTRADOR y la baja "
-            + "dejaría el sistema sin administradores activos")
+    @ApiResponse(responseCode = "409", description = "Es un rol de sistema, o es el rol "
+            + "ADMINISTRADOR y la baja dejaría el sistema sin administradores activos")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> desactivar(@PathVariable Long id) {
         rolService.desactivar(id);
@@ -122,9 +132,12 @@ public class RolController {
     @Operation(summary = "Reactivar un rol dado de baja",
             description = "Vuelve a poner activo=true. Las asignaciones que tenía en "
                     + "usuario_rol y rol_permiso nunca se borraron al desactivarlo, así que "
-                    + "quedan vigentes de nuevo automáticamente.")
+                    + "quedan vigentes de nuevo automáticamente. Un rol de sistema solo lo "
+                    + "reactiva el superadministrador (SEG-H09 R7).")
     @ApiResponse(responseCode = "400", description = "El id no es un valor positivo")
     @ApiResponse(responseCode = "200", description = "Rol reactivado")
+    @ApiResponse(responseCode = "403", description = "Es un rol de sistema y quien llama no "
+            + "es el superadministrador")
     @ApiResponse(responseCode = "404", description = "No existe un rol con ese id")
     @PatchMapping("/{id}/activar")
     public ResponseEntity<RolResponse> reactivar(@PathVariable Long id) {

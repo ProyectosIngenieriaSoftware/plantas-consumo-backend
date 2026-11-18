@@ -63,9 +63,12 @@ public class RolPermisoController {
 
     @Operation(summary = "Asignar un permiso a un rol",
             description = "Crea la fila en rol_permiso. La combinación idRol + idPermiso no "
-                    + "puede repetirse.")
+                    + "puede repetirse. Si el rol es de sistema (esSistema=true), solo el "
+                    + "superadministrador puede cambiar sus permisos (SEG-H09 R7).")
     @ApiResponse(responseCode = "201", description = "Permiso asignado")
     @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "403", description = "El rol es de sistema y quien llama no "
+            + "es el superadministrador")
     @ApiResponse(responseCode = "404", description = "No existe el rol o el permiso indicado")
     @ApiResponse(responseCode = "409", description = "El rol ya tiene asignado ese permiso, o el rol/permiso está desactivado")
     @PostMapping
@@ -76,10 +79,16 @@ public class RolPermisoController {
 
     @Operation(summary = "Quitar un permiso de un rol",
             description = "Borra físicamente la fila de rol_permiso (la relación en sí no "
-                    + "tiene baja lógica: o el rol tiene el permiso, o no lo tiene).")
+                    + "tiene baja lógica: o el rol tiene el permiso, o no lo tiene). Si el "
+                    + "rol es de sistema (esSistema=true), solo el superadministrador puede "
+                    + "cambiar sus permisos: vaciar el rol ADMINISTRADOR degradaría a todos "
+                    + "los administradores de una sola petición (SEG-H09 R7).")
     @ApiResponse(responseCode = "204", description = "Permiso quitado del rol")
     @ApiResponse(responseCode = "400", description = "Algún id no es un valor positivo")
-    @ApiResponse(responseCode = "404", description = "El rol no tenía asignado ese permiso")
+    @ApiResponse(responseCode = "403", description = "El rol es de sistema y quien llama no "
+            + "es el superadministrador")
+    @ApiResponse(responseCode = "404", description = "No existe el rol, o el rol no tenía "
+            + "asignado ese permiso")
     @DeleteMapping("/rol/{idRol}/permiso/{idPermiso}")
     public ResponseEntity<Void> quitar(@PathVariable Long idRol, @PathVariable Long idPermiso) {
         rolPermisoService.quitar(idRol, idPermiso);

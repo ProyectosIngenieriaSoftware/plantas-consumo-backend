@@ -35,4 +35,26 @@ public class Rol {
     @Builder.Default
     @Column(name = "activo", nullable = false)
     private Boolean activo = true;
+
+    /**
+     * Si es uno de los roles que el sistema necesita para funcionar
+     * (ADMINISTRADOR e INVESTIGADOR), de {@code V20}.
+     *
+     * <h2>Para que esta</h2>
+     * Es el ancla de SEG-H09 R7. Las reglas que protegen el acceso de
+     * administracion preguntaban si un rol <em>se llama</em> ADMINISTRADOR, y
+     * el nombre es un dato que {@code PUT /api/roles/{id}} escribe: renombrarlo
+     * apagaba R2, R3 y R5 de una peticion. Ahora la autoridad es esta columna,
+     * que ninguna ruta escribe.
+     *
+     * <h2>Quien la escribe</h2>
+     * Solo una migracion. No esta en {@code RolRequest}, y ni
+     * {@code RolMapper.toEntity} ni {@code .updateEntity} la tocan, asi que un
+     * rol creado por la API nace en {@code false} --el {@code @Builder.Default}
+     * y el DEFAULT de la columna dicen lo mismo-- y ningun cuerpo la puede
+     * cambiar. Igual que {@code usuario.es_superadmin}.
+     */
+    @Builder.Default
+    @Column(name = "es_sistema", nullable = false)
+    private Boolean esSistema = false;
 }

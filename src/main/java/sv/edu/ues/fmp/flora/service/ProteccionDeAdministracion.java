@@ -1,5 +1,6 @@
 package sv.edu.ues.fmp.flora.service;
 
+import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.stereotype.Component;
@@ -13,7 +14,7 @@ import sv.edu.ues.fmp.flora.repository.UsuarioRepository;
 import sv.edu.ues.fmp.flora.repository.UsuarioRolRepository;
 
 /**
- * Las seis reglas que protegen el acceso de administracion (SEG-H09).
+ * Las siete reglas que protegen el acceso de administracion (SEG-H09).
  *
  * <h2>Que agujero cierra</h2>
  * El permiso {@code USUARIO_GESTIONAR} abre todo el modulo de seguridad, y eso
@@ -62,7 +63,63 @@ import sv.edu.ues.fmp.flora.repository.UsuarioRolRepository;
  *           Es el lado de la EDICION de lo que R4 ya decia de la baja y del
  *           rol.</td>
  *       <td>403</td></tr>
+ *   <tr><td>R7a Roles de sistema: solo el superadmin</td>
+ *       <td>Cualquier mutacion de un rol con {@code es_sistema = true}
+ *           --editar, renombrar, dar de baja, reactivar, agregar o quitar sus
+ *           permisos-- la hace solo el superadministrador.</td>
+ *       <td>403</td></tr>
+ *   <tr><td>R7b Roles de sistema: nombre y fila intocables</td>
+ *       <td>Renombrar o dar de baja un rol de sistema no lo puede hacer
+ *           NADIE, el superadministrador incluido.</td>
+ *       <td>409</td></tr>
  * </table>
+ *
+ * <h2>R7: por que el flag y no el nombre</h2>
+ * R2, R3 y R5 preguntan si un rol <em>se llama</em> ADMINISTRADOR
+ * ({@link #esElRolDeAdministrador(Rol)} compara por nombre, y
+ * {@code UsuarioRolRepository} cuenta por nombre). El nombre de un rol es un
+ * dato editable: {@code PUT /api/roles/{id}} escribe {@code rol.nombre} y no
+ * pasaba por ninguna regla. Con {@code USUARIO_GESTIONAR} alcanzaba para
+ * renombrar ADMINISTRADOR y, a partir de ahi, R2 dejaba de impedir la
+ * auto-promocion, R3 dejaba de proteger a los demas administradores y el
+ * invariante de R5 se cumplia trivialmente porque la cuenta de
+ * administradores daba cero. Por {@code /api/rol-permisos} habia una segunda
+ * via con el mismo efecto: vaciar de permisos el rol degrada a todos los
+ * administradores --superadmin incluido-- de una sola peticion.
+ * <p>
+ * Ninguna de esas vias tocaba al <em>usuario</em> superadministrador, asi que
+ * R4 y R6 seguian cumpliendose y la cuenta no se podia desactivar ni editar:
+ * quedaba marcada como superadmin y sin ningun poder. Lo que se perdia no era
+ * la cuenta, era la proteccion. R7 se ancla en {@code rol.es_sistema}
+ * ({@code V20}), que ninguna ruta de la API escribe, igual que R6 se ancla en
+ * {@code usuario.es_superadmin}.
+ *
+ * <h2>R7: por que dos caras y dos codigos</h2>
+ * Las dos mitades responden preguntas distintas y por eso no comparten
+ * codigo:
+ * <ul>
+ *   <li><strong>R7a es de autoridad</strong>: quien llama no puede hacer esto.
+ *       403, como R2, R3, R4 y R6.</li>
+ *   <li><strong>R7b es estructural</strong>: esto no se puede hacer, y no por
+ *       falta de autoridad --el superadministrador la tiene-- sino porque
+ *       choca con un recurso protegido. 409, que es el codigo con el que este
+ *       backend contesta los conflictos, y el mismo que ya devolvia R5.</li>
+ * </ul>
+ * Un 403 al superadministrador seria mentira: le diria que le faltan permisos
+ * cuando lo que pasa es que la operacion no existe para ese rol.
+ *
+ * <h2>R7 frente a R5: el orden y por que</h2>
+ * En una baja de rol, R7 se evalua ANTES que R5, siguiendo el criterio de la
+ * seccion siguiente: las prohibiciones absolutas van primero y no tiene
+ * sentido contar administradores en una operacion que de todas formas no
+ * estaba permitida. El efecto es que
+ * {@link #verificarDesactivacionDeRol(Rol)} queda inalcanzable para el rol
+ * ADMINISTRADOR --un rol de sistema ya no se da de baja nunca-- y se conserva
+ * por dos motivos: sigue siendo el invariante de cualquier rol que algun dia
+ * se llame ADMINISTRADOR sin llevar el flag (una base donde {@code V20} no
+ * marcara lo que debia), y es la mitad de R5 que esta tarea no toca. La otra
+ * mitad de R5, la de usuarios --no se puede desactivar al ultimo
+ * administrador activo-- sigue plenamente vigente y con sus pruebas.
  *
  * <h2>Por que hizo falta R6</h2>
  * R3 y R4 cubrian la baja logica y el rol, las dos vias que quitan el acceso.
@@ -103,8 +160,10 @@ import sv.edu.ues.fmp.flora.repository.UsuarioRolRepository;
  * Y por que un componente y no codigo dentro de cada servicio: las mismas
  * reglas las aplican {@code UsuarioRolServiceImpl.asignar} y {@code .quitar}
  * --modulo usuario-rol--, {@code UsuarioServiceImpl.desactivar} y
- * {@code .actualizar} --modulo usuario-- y {@code RolServiceImpl.desactivar}
- * --modulo rol--. Repetirlas en
+ * {@code .actualizar} --modulo usuario--, {@code RolServiceImpl.actualizar},
+ * {@code .desactivar} y {@code .reactivar} --modulo rol-- y
+ * {@code RolPermisoServiceImpl.asignar} y {@code .quitar} --modulo
+ * rol-permiso--. Nueve sitios. Repetirlas en
  * cada sitio es como se abren los huecos, y la cuarta via fue exactamente eso:
  * {@code DELETE /api/roles/{id}} sobre el rol ADMINISTRADOR lo desactivaba
  * para todos --dejando el sistema sin administradores-- sin pasar por ninguna
@@ -346,6 +405,143 @@ public class ProteccionDeAdministracion {
                     "No se puede desactivar el rol " + ADMINISTRADOR
                             + " porque el sistema quedaria sin administradores activos");
         }
+    }
+
+    /**
+     * R7a, antes de cualquier mutacion de un rol: solo el superadministrador
+     * toca los roles de sistema.
+     *
+     * <h2>Donde se llama</h2>
+     * En las cinco vias que mutan un rol o sus permisos:
+     * {@code RolServiceImpl.actualizar}, {@code .desactivar} y
+     * {@code .reactivar}, y {@code RolPermisoServiceImpl.asignar} y
+     * {@code .quitar}. Que sean cinco es justamente el motivo de que la regla
+     * viva aqui y no repetida en cada servicio: la cuarta via de SEG-H09 se
+     * abrio exactamente asi.
+     *
+     * <h2>Lo que no decide</h2>
+     * Si la mutacion concreta esta permitida siquiera para el
+     * superadministrador: eso lo contestan
+     * {@link #verificarRenombradoDeRol(Rol, String)} y
+     * {@link #verificarBajaDeRol(Rol)}, que van despues. R7a solo responde
+     * "quien".
+     * <p>
+     * Y no mira el nombre del rol: un rol de sistema lo es por el flag. Para
+     * los roles personalizados --los que nacen por {@code POST /api/roles},
+     * todos en {@code false}-- este metodo no hace nada y la gestion del
+     * catalogo de roles sigue siendo de quien tenga {@code USUARIO_GESTIONAR}.
+     *
+     * @param rol rol que se mutaria
+     * @throws OperacionNoPermitidaException R7a: es un rol de sistema y quien
+     *                                       llama no es el superadministrador
+     */
+    public void verificarMutacionDeRol(Rol rol) {
+        if (!esRolDeSistema(rol)) {
+            return;
+        }
+
+        if (!quienLlamaEsSuperadmin()) {
+            throw new OperacionNoPermitidaException(
+                    "El rol " + rol.getNombre() + " es un rol de sistema: solo el "
+                            + "superadministrador puede modificarlo");
+        }
+    }
+
+    /**
+     * R7b, el nombre: un rol de sistema no se renombra, ni siquiera el
+     * superadministrador.
+     *
+     * <h2>Por que el nombre y no el resto</h2>
+     * Porque el nombre es el dato del que colgaba la proteccion antes de
+     * {@code V20}, y sigue colgando en parte: {@link #ADMINISTRADOR} se compara
+     * por nombre en R2, R3 y R5, y {@code UsuarioRolRepository} cuenta por
+     * nombre. Mientras eso siga asi, renombrar es la operacion que apaga las
+     * reglas, y no hay ninguna razon de negocio para permitirla: el nombre de
+     * un rol de sistema es parte de su identidad, no una etiqueta.
+     * <p>
+     * Que tampoco lo pueda el superadministrador no es desconfianza, es que la
+     * operacion no deberia existir: un renombrado accidental --un PUT que
+     * reenvia un nombre mal escrito junto con la descripcion nueva-- dejaria el
+     * sistema sin administradores a efectos de R5 sin que nadie lo pidiera. La
+     * descripcion y los permisos si los cambia, que es lo que de verdad se
+     * administra.
+     *
+     * <h2>Que cuenta como renombrar</h2>
+     * Cualquier valor distinto del actual, comparando exacto y no
+     * {@code ignoreCase}: {@code rol_nombre_key} es un UNIQUE sensible a
+     * mayusculas, asi que pasar de 'ADMINISTRADOR' a 'Administrador' tambien
+     * cambia la fila --y rompe las comparaciones que usan {@code upper()}--.
+     * Reenviar el mismo nombre no es un renombrado y deja pasar la peticion,
+     * que es lo que permite cambiar solo la descripcion con el PUT completo que
+     * expone la API.
+     *
+     * @param rol         rol que se editaria
+     * @param nombreNuevo nombre que traeria el cuerpo de la peticion
+     * @throws EstadoInvalidoException R7b: es un rol de sistema y el nombre
+     *                                 cambia
+     */
+    public void verificarRenombradoDeRol(Rol rol, String nombreNuevo) {
+        if (!esRolDeSistema(rol)) {
+            return;
+        }
+
+        if (!Objects.equals(rol.getNombre(), nombreNuevo)) {
+            throw new EstadoInvalidoException(
+                    "No se puede renombrar un rol de sistema: " + rol.getNombre()
+                            + " tiene que conservar su nombre. Si puede cambiar su "
+                            + "descripcion y sus permisos");
+        }
+    }
+
+    /**
+     * R7b, la fila: un rol de sistema no se da de baja, ni siquiera el
+     * superadministrador.
+     *
+     * <h2>Que via cierra</h2>
+     * {@code DELETE /api/roles/{id}}, que en este proyecto es baja logica. Un
+     * rol dado de baja no otorga nada --{@code obtenerPermisosEfectivosDeUsuario}
+     * lo salta y {@link #esAdministrador(Usuario)} tampoco lo cuenta-- asi que
+     * la baja del rol ADMINISTRADOR degrada a todos los administradores de una
+     * peticion, y la del rol INVESTIGADOR deja sin trabajar a todo el personal
+     * cientifico. R5 ya cubria el primer caso con un 409, pero solo cuando
+     * quedaban administradores activos que contar: con cero, la baja se
+     * permitia. Ahora no se permite nunca.
+     *
+     * <h2>Por que para nadie</h2>
+     * Mismo motivo que el nombre: no es una operacion que el sistema necesite.
+     * Un rol de sistema que no debe usarse se vacia de permisos --eso si lo
+     * puede el superadministrador-- o se deja de asignar; darlo de baja no
+     * aporta nada que no se consiga de otra forma y si deja el sistema en un
+     * estado del que solo se sale por SQL.
+     *
+     * <h2>Va antes de R5</h2>
+     * Y por eso {@link #verificarDesactivacionDeRol(Rol)} queda inalcanzable
+     * para ADMINISTRADOR. Ver el encabezado de la clase.
+     *
+     * @param rol rol que se daria de baja
+     * @throws EstadoInvalidoException R7b: es un rol de sistema
+     */
+    public void verificarBajaDeRol(Rol rol) {
+        if (!esRolDeSistema(rol)) {
+            return;
+        }
+
+        throw new EstadoInvalidoException(
+                "El rol " + rol.getNombre() + " es un rol de sistema y no se puede "
+                        + "eliminar. Si necesita retirarlo, quitele sus permisos o deje "
+                        + "de asignarlo");
+    }
+
+    /**
+     * Si el rol lleva la marca de {@code V20}.
+     * <p>
+     * Un {@code rol} nulo no es de sistema: el lado seguro aqui es el contrario
+     * que en {@link #esSuperadmin(Usuario)}, porque una regla que bloqueara con
+     * un nulo convertiria cualquier error de programacion en un 403 sobre todos
+     * los roles. Los servicios siempre llaman con la entidad ya resuelta.
+     */
+    private static boolean esRolDeSistema(Rol rol) {
+        return rol != null && Boolean.TRUE.equals(rol.getEsSistema());
     }
 
     /**
