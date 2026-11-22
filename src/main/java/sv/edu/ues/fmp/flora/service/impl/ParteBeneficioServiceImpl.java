@@ -60,6 +60,59 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
                 .toList();
     }
 
+    /**
+     * El listado por padre: los beneficios activos de una parte comestible.
+     *
+     * <h2>Por que hacia falta</h2>
+     * El modulo solo tenia dos listados, y los dos son globales --un
+     * {@code findAll()} y un {@code findByActivaTrue()}-- asi que ambos exigen
+     * {@code ESPECIE_CONSULTAR} con razon: devuelven tambien los beneficios de
+     * las fichas sin publicar. Eso dejaba a la ficha publica sin manera de
+     * pedir los beneficios de una parte: tenia que adivinar cada
+     * {@code idBeneficio} para usar
+     * {@link #obtenerPorId(Long, Long)}. Es el mismo caso que
+     * {@code GET /api/epocas-cosecha?idEspecieParte={id}}, salvo que aqui la
+     * ruta por padre no existia.
+     *
+     * <h2>El criterio de estado</h2>
+     * Solo {@code activa = true}, el mismo que
+     * {@link #listarActivas()}: lo publico no pinta las asociaciones dadas de
+     * baja. Las inactivas siguen siendo visibles por los dos listados
+     * administrativos y por {@link #obtenerPorId(Long, Long)}.
+     *
+     * <h2>El filtro de visibilidad</h2>
+     * La parte de una ficha sin publicar se responde como una parte que no
+     * existe: el mismo 404 que acaba de lanzar {@link #buscarParteComestible}.
+     * Es lo que ya hacen los hermanos del listado
+     * --{@code PreparacionConsumoServiceImpl.listarPorParte} y
+     * {@code EpocaCosechaServiceImpl.listarPorParte}-- y lo que permite que la
+     * ruta quede abierta sin filtrar en la matriz de seguridad: un 403 sobre el
+     * id de una parte confirmaria que esta ocupado por una ficha en
+     * preparacion.
+     *
+     * @return la lista de beneficios activos; vacia si la parte existe, se
+     *         puede ver y no tiene ninguno
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<ParteBeneficioResponse> listarPorParte(Long idEspecieParte) {
+        validarId(idEspecieParte, "parte comestible");
+
+        EspecieParteComestible parte = buscarParteComestible(idEspecieParte);
+
+        if (!visibilidadDeEspecie.puedeVer(parte.getEspecie().getIdEspecie())) {
+            throw parteNoEncontrada(idEspecieParte);
+        }
+
+        return parteBeneficioRepository
+                .findByEspecieParteComestibleIdEspecieParteAndActivaTrueOrderByIdIdBeneficioAsc(
+                        idEspecieParte
+                )
+                .stream()
+                .map(parteBeneficioMapper::toResponse)
+                .toList();
+    }
+
     @Override
     @Transactional(readOnly = true)
     public ParteBeneficioResponse obtenerPorId(
@@ -220,10 +273,23 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
 
     private EspecieParteComestible buscarParteComestible(Long idEspecieParte) {
         return especieParteComestibleRepository.findById(idEspecieParte)
-                .orElseThrow(() -> new RecursoNoEncontradoException(
-                        "No existe la parte comestible con id "
-                                + idEspecieParte
-                ));
+                .orElseThrow(() -> parteNoEncontrada(idEspecieParte));
+    }
+
+    /**
+     * El 404 de la parte comestible, en un solo sitio.
+     * <p>
+     * Lo lanzan dos caminos y tiene que decir exactamente lo mismo en los dos:
+     * la parte que no existe y --desde el filtro de visibilidad de
+     * {@link #listarPorParte(Long)}-- la parte de una ficha que quien llama no
+     * puede ver. Si los mensajes difirieran, la diferencia delataria que ese id
+     * esta ocupado por una ficha sin publicar. El texto es el que ya devolvia
+     * este metodo tal cual, para no cambiarle la respuesta a nadie.
+     */
+    private static RecursoNoEncontradoException parteNoEncontrada(Long idEspecieParte) {
+        return new RecursoNoEncontradoException(
+                "No existe la parte comestible con id " + idEspecieParte
+        );
     }
 
     private Beneficio buscarBeneficio(Long idBeneficio) {

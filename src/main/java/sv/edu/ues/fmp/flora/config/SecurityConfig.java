@@ -204,9 +204,21 @@ public class SecurityConfig {
      * <h2>Lo que no entra aqui</h2>
      * Los listados hermanos que si reciben el id del padre
      * --{@code /api/preparaciones-consumo/parte/{id}},
-     * {@code /api/aportes-nutricionales/especie-parte/{id}} y
-     * {@code /api/epocas-cosecha?idEspecieParte={id}}-- se quedan publicos: ya
+     * {@code /api/aportes-nutricionales/especie-parte/{id}},
+     * {@code /api/epocas-cosecha?idEspecieParte={id}} y
+     * {@code /api/parte-beneficios/parte/{id}}-- se quedan publicos: ya
      * preguntan por el estado de la ficha dentro del servicio.
+     * <p>
+     * El ultimo de esos cuatro llego despues y <strong>no hizo falta tocar
+     * ninguna de las dos listas</strong>: {@code /api/parte-beneficios/**} ya
+     * esta en {@link #CATALOGO_PUBLICO}, y los dos recortes de aqui son rutas
+     * exactas --{@code /api/parte-beneficios} y
+     * {@code /api/parte-beneficios/activas}-- que no cubren
+     * {@code /parte/{id}}. O sea que la ruta nueva nace publica por el comodin
+     * y los dos listados globales siguen cerrados. Si algun dia estos recortes
+     * se ensanchan a {@code /api/parte-beneficios/*}, hay que sacar
+     * {@code /parte/{id}} a mano o el catalogo publico se queda otra vez sin
+     * los beneficios de las partes.
      * <p>
      * {@code GET /api/epocas-cosecha} estaba en esta lista y salio. Era el
      * unico listado de epocas de cosecha, asi que cerrarlo dejo al catalogo

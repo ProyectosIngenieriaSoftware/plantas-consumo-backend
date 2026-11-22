@@ -165,6 +165,16 @@ class ListadosGlobalesDeEspecieTest {
         mockMvc.perform(get(PARTE_BENEFICIOS + "/" + ID_INEXISTENTE + "/" + ID_INEXISTENTE))
                 .andExpect(status().isNotFound());
 
+        // El listado por parte de parte_beneficio, la ruta que el modulo no
+        // tenia: cae bajo el comodin /api/parte-beneficios/** de
+        // CATALOGO_PUBLICO y los dos recortes de LISTADOS_GLOBALES son rutas
+        // exactas, asi que no la alcanzan. El 404 es la respuesta del servicio
+        // a una parte que no existe: el anonimo llego al metodo, que es lo que
+        // esta prueba fija. Lo que se ve o no por ella lo cubren
+        // EspecieRutasPlanasVisibilidadTest y ParteBeneficiosPorParteTest.
+        mockMvc.perform(get(PARTE_BENEFICIOS + "/parte/" + ID_INEXISTENTE))
+                .andExpect(status().isNotFound());
+
         mockMvc.perform(get(EPOCAS + "/" + ID_INEXISTENTE))
                 .andExpect(status().isNotFound());
 

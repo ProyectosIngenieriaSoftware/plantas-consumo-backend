@@ -169,6 +169,20 @@ class EspecieRutasPlanasVisibilidadTest {
                 // padre, y responde 200 o 404 segun el estado de la ficha.
                 new Caso("epocas de una parte",
                         "/api/epocas-cosecha?idEspecieParte="
+                                + ficha.parte().getIdEspecieParte()),
+                // El decimosexto, por el mismo motivo que el anterior pero al
+                // reves: parte_beneficio no tenia ninguna ruta por padre. Sus
+                // dos listados son globales y exigen ESPECIE_CONSULTAR con
+                // razon, asi que la ficha publica no podia listar los
+                // beneficios de una parte sin adivinar cada idBeneficio. La
+                // ruta se anadio y, como entra por el id de la parte, aplica
+                // VisibilidadDeEspecie igual que sus hermanas: entra aqui con
+                // ellas y responde 200 o 404 segun el estado de la ficha. Lo
+                // propio de esa ruta --el contenido de la lista, la parte sin
+                // beneficios y el criterio de activa-- lo cubre
+                // ParteBeneficiosPorParteTest.
+                new Caso("beneficios de una parte",
+                        "/api/parte-beneficios/parte/"
                                 + ficha.parte().getIdEspecieParte()));
     }
 
@@ -290,7 +304,8 @@ class EspecieRutasPlanasVisibilidadTest {
                 "/api/imagenes-preparacion/preparacion/" + ID_INEXISTENTE,
                 "/api/videos-preparacion/preparacion/" + ID_INEXISTENTE,
                 "/api/ubicaciones/especie/" + ID_INEXISTENTE,
-                "/api/epocas-cosecha?idEspecieParte=" + ID_INEXISTENTE);
+                "/api/epocas-cosecha?idEspecieParte=" + ID_INEXISTENTE,
+                "/api/parte-beneficios/parte/" + ID_INEXISTENTE);
 
         for (String ruta : rutas) {
             mockMvc.perform(get(ruta))
