@@ -190,10 +190,11 @@ class ListadosGlobalesDeEspecieTest {
         mockMvc.perform(get("/api/aportes-nutricionales/" + ID_INEXISTENTE))
                 .andExpect(status().isNotFound());
 
-        // La excepcion documentada de la familia: nunca valido que la parte
-        // existiera, asi que contesta 200 con lista vacia.
+        // Alineado con sus hermanos: la parte que no existe es 404. El anonimo
+        // llego al metodo, que es lo que esta prueba fija; el borrador lo cubre
+        // EspecieRutasPlanasVisibilidadTest.
         mockMvc.perform(get("/api/aportes-nutricionales/especie-parte/" + ID_INEXISTENTE))
-                .andExpect(status().isOk());
+                .andExpect(status().isNotFound());
     }
 
     /** Los catalogos que no cuelgan de ninguna especie no entraron en el cambio. */

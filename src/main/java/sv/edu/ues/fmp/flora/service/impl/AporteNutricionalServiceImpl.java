@@ -41,25 +41,29 @@ public class AporteNutricionalServiceImpl implements AporteNutricionalService {
     @Override
     @Transactional(readOnly = true)
     public List<AporteNutricionalResponse> listarPorEspecieParte(Long idEspecieParte) {
-        // Este listado es el unico del alcance que NO valida que la parte
-        // exista: para un id inventado siempre devolvio 200 con lista vacia. Se
-        // deja asi y la parte de una ficha sin publicar devuelve tambien la
-        // lista vacia, que es exactamente la misma respuesta. Cambiarlo a 404
-        // --como hacen sus hermanos-- seria cambiarle el contrato al frontend
-        // sin que nadie lo haya pedido.
-        if (!puedeVerLaParte(idEspecieParte)) {
-            return List.of();
+        // Mismo patron que sus hermanos (epocas de cosecha, preparaciones y
+        // parte-beneficios): la parte que no existe y la parte de una ficha que
+        // quien llama no puede ver responden el mismo 404, con el mismo texto.
+        // Una parte visible sin aportes sigue devolviendo 200 con lista vacia.
+        EspecieParteComestible parte = especieParteRepository.findById(idEspecieParte)
+                .orElseThrow(() -> parteNoEncontrada(idEspecieParte));
+
+        if (!visibilidadDeEspecie.puedeVer(parte.getEspecie().getIdEspecie())) {
+            throw parteNoEncontrada(idEspecieParte);
         }
 
         return aporteRepository.findByEspecieParteComestibleIdEspecieParteOrderByIdAporteAsc(idEspecieParte)
                 .stream().map(mapper::toResponse).toList();
     }
 
-    /** Si la parte existe y la especie de la que cuelga se puede ver. */
-    private boolean puedeVerLaParte(Long idEspecieParte) {
-        return especieParteRepository.findById(idEspecieParte)
-                .map(parte -> visibilidadDeEspecie.puedeVer(parte.getEspecie().getIdEspecie()))
-                .orElse(false);
+    /**
+     * El 404 de la parte comestible, en un solo sitio: lo lanzan la parte que
+     * no existe y la parte de una ficha que quien llama no puede ver. Si los
+     * mensajes difirieran, delatarian que ese id es de una ficha sin publicar.
+     * Es el mismo texto que usan los servicios hermanos.
+     */
+    private static RecursoNoEncontradoException parteNoEncontrada(Long idEspecieParte) {
+        return new RecursoNoEncontradoException("No existe la parte comestible con id " + idEspecieParte);
     }
 
     @Override

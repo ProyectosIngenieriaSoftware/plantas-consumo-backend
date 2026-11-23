@@ -319,27 +319,58 @@ class EspecieRutasPlanasVisibilidadTest {
     }
 
     /**
-     * La excepcion de la familia: {@code /api/aportes-nutricionales/especie-parte/{id}}
-     * nunca valido que la parte existiera y devolvia 200 con lista vacia para
-     * un id inventado. Se dejo asi, y la parte de un borrador devuelve tambien
-     * la lista vacia: las dos respuestas siguen siendo la misma, que es lo que
-     * se busca, sin cambiarle el contrato al frontend.
+     * {@code /api/aportes-nutricionales/especie-parte/{id}} era la excepcion de
+     * la familia: devolvia 200 con lista vacia para la parte de un borrador y
+     * para un id inventado. Se alineo con sus hermanos (epocas de cosecha,
+     * preparaciones y parte-beneficios): las dos salidas son ahora el mismo
+     * 404, con el mismo cuerpo, para que no se puedan distinguir.
      * <p>
-     * La parte sembrada tiene un aporte, asi que la lista vacia aqui solo puede
-     * venir del guard: si se cayera, en su lugar apareceria ese aporte.
+     * La parte sembrada tiene un aporte, asi que el 404 aqui solo puede venir
+     * del filtro: si se cayera, en su lugar apareceria un 200 con ese aporte.
      */
     @Test
-    void aportesPorEspecieParte_elBorradorYUnIdInventadoDevuelvenListaVacia() throws Exception {
+    void aportesPorEspecieParte_elBorradorYUnIdInventadoDevuelven404Iguales() throws Exception {
+        String delInventado = cuerpoDe("/api/aportes-nutricionales/especie-parte/" + ID_INEXISTENTE);
+
         for (Ficha ficha : sinPublicar()) {
-            mockMvc.perform(get("/api/aportes-nutricionales/especie-parte/"
-                            + ficha.parte().getIdEspecieParte()))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isArray())
-                    .andExpect(jsonPath("$").isEmpty());
+            String rutaDelBorrador = "/api/aportes-nutricionales/especie-parte/"
+                    + ficha.parte().getIdEspecieParte();
+
+            mockMvc.perform(get(rutaDelBorrador))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.estado").value(404))
+                    .andExpect(jsonPath("$.error").value("Recurso no encontrado"));
+
+            // Token sin ESPECIE_CONSULTAR: tambien 404, no 403.
+            mockMvc.perform(get(rutaDelBorrador)
+                            .header(HttpHeaders.AUTHORIZATION, tokenCon("MULTIMEDIA_GESTIONAR")))
+                    .andExpect(status().isNotFound());
+
+            assertEquals(
+                    normalizar(delInventado),
+                    normalizar(cuerpoDe(rutaDelBorrador)),
+                    "el 404 de la parte de un borrador y el de un id inventado difieren");
         }
 
-        mockMvc.perform(get("/api/aportes-nutricionales/especie-parte/" + ID_INEXISTENTE))
+        // El id inventado es 404 tambien con el permiso.
+        mockMvc.perform(get("/api/aportes-nutricionales/especie-parte/" + ID_INEXISTENTE)
+                        .header(HttpHeaders.AUTHORIZATION, tokenCon(ESPECIE_CONSULTAR)))
+                .andExpect(status().isNotFound());
+    }
+
+    /**
+     * Una parte visible sin aportes no es un 404: la parte existe y se puede
+     * ver, simplemente su lista esta vacia.
+     */
+    @Test
+    void aportesPorEspecieParte_parteVisibleSinAportes_devuelve200Vacio() throws Exception {
+        entityManager.remove(publicada.aporte());
+        entityManager.flush();
+
+        mockMvc.perform(get("/api/aportes-nutricionales/especie-parte/"
+                        + publicada.parte().getIdEspecieParte()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
     }
 
