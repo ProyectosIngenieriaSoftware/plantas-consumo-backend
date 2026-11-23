@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.transaction.annotation.Transactional;
 
 import sv.edu.ues.fmp.flora.dto.response.UsuarioResponse;
+import sv.edu.ues.fmp.flora.repository.UsuarioRepository;
 import sv.edu.ues.fmp.flora.service.EmailService;
 import sv.edu.ues.fmp.flora.service.JwtService;
 
@@ -166,7 +167,7 @@ class AutorizacionPorPermisoTest {
      */
     private String tokenCon(String... permisos) {
         UsuarioResponse usuario = UsuarioResponse.builder()
-                .id(999L)
+                .id(idDeUsuarioActivo())
                 .nombres("Prueba")
                 .apellidos("Autorizacion")
                 .correo("prueba.autorizacion@local")
@@ -302,13 +303,22 @@ class AutorizacionPorPermisoTest {
                 .andExpect(status().isForbidden());
     }
 
+    /**
+     * Antes se afirmaba 404 aqui: el token iba a nombre del id 999 y el
+     * servicio no encontraba a ese responsable, asi que el 404 era la prueba
+     * de que la peticion habia pasado el guard del permiso. Desde que los
+     * tokens de las pruebas son de una cuenta real --lo exige
+     * {@code VerificacionDeCuentaActiva}-- la ficha se crea de verdad, y el
+     * 201 demuestra lo mismo con menos rodeo: si el guard cortara, seria 403.
+     * El rollback de la clase se lleva la ficha.
+     */
     @Test
     void crearEspecie_conEspecieCrear_atraviesaElGuard() throws Exception {
         mockMvc.perform(post("/api/especies")
                         .header(HttpHeaders.AUTHORIZATION, bearer(tokenCon(ESPECIE_CREAR)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CUERPO_ESPECIE))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -652,5 +662,20 @@ class AutorizacionPorPermisoTest {
                         .content("{\"usuario\":\"no.existe\",\"clave\":\"no-importa\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.mensaje").value("Usuario o clave incorrectos"));
+    }
+
+    /**
+     * El token de estas pruebas firma a nombre de una cuenta real y activa.
+     * <p>
+     * Antes iba un id inventado (999): daba igual, porque nadie consultaba al
+     * usuario. Con {@code VerificacionDeCuentaActiva} en la cadena ese token
+     * recibe 401, y con razon --es el mismo caso que un token de una cuenta
+     * borrada--. Ver {@link sv.edu.ues.fmp.flora.config.UsuariosDePrueba}.
+     */
+    @Autowired
+    private UsuarioRepository usuarioRepositorioDePruebas;
+
+    private Long idDeUsuarioActivo() {
+        return UsuariosDePrueba.idActivo(usuarioRepositorioDePruebas);
     }
 }

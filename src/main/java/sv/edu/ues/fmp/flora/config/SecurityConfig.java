@@ -14,6 +14,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import sv.edu.ues.fmp.flora.repository.UsuarioRepository;
+import sv.edu.ues.fmp.flora.service.UsuarioAutenticado;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
@@ -380,8 +383,29 @@ public class SecurityConfig {
         this.accesoDenegadoHandler = accesoDenegadoHandler;
     }
 
+    /**
+     * El filtro de revocacion inmediata.
+     * <p>
+     * Se declara aqui, y no con un {@code @Component} sobre la clase, porque
+     * {@code @WebMvcTest} incluye a proposito los beans de tipo
+     * {@code Filter} y no los repositorios JPA: un filtro que pide el
+     * {@code UsuarioRepository} y se registra solo rompe el arranque de las
+     * pruebas de controlador cortadas. Declarado donde se usa, vive unicamente
+     * en el contexto que tambien trae esta cadena.
+     */
     @Bean
-    public SecurityFilterChain filtroDeSeguridad(HttpSecurity http) throws Exception {
+    public VerificacionDeCuentaActiva verificacionDeCuentaActiva(
+            UsuarioRepository usuarioRepository,
+            UsuarioAutenticado usuarioAutenticado) {
+
+        return new VerificacionDeCuentaActiva(
+                usuarioRepository, usuarioAutenticado, autenticacionEntryPoint);
+    }
+
+    @Bean
+    public SecurityFilterChain filtroDeSeguridad(
+            HttpSecurity http,
+            VerificacionDeCuentaActiva verificacionDeCuentaActiva) throws Exception {
         http
                 // Sin CSRF: no hay sesion ni cookie de sesion que proteger, la
                 // credencial viaja en la cabecera Authorization y el navegador
@@ -431,6 +455,17 @@ public class SecurityConfig {
                         // los del proyecto o el 401 saldria con cuerpo vacio.
                         .authenticationEntryPoint(autenticacionEntryPoint)
                         .accessDeniedHandler(accesoDenegadoHandler))
+
+                // Revocacion inmediata: la cuenta desactivada deja de operar
+                // en la siguiente peticion, no al caducar su token. Va
+                // DESPUES del filtro que autentica el bearer --necesita el
+                // principal ya puesto para leerle el id-- y por eso mismo
+                // ANTES de la matriz de autorizacion y de los @PreAuthorize:
+                // asi corre en toda peticion autenticada, lecturas incluidas
+                // (SEG-110 era un GET), y el usuario desactivado recibe 401
+                // sin llegar al controlador. Ver VerificacionDeCuentaActiva.
+                .addFilterAfter(verificacionDeCuentaActiva,
+                        BearerTokenAuthenticationFilter.class)
 
                 .exceptionHandling(errores -> errores
                         .authenticationEntryPoint(autenticacionEntryPoint)

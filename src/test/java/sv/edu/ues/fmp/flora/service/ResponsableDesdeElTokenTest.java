@@ -57,13 +57,18 @@ import sv.edu.ues.fmp.flora.repository.EspecieRepository;
  * posible esta en quien queda firmando.
  *
  * <h2>La prueba que distingue</h2>
- * {@link #crear_conTokenDeUnUsuarioInexistente_falla404AunqueElCuerpoTraigaUnoValido()}
- * es la que no se puede pasar por casualidad: el token identifica a un usuario
- * que no existe y el cuerpo trae uno que si. Con el arreglo la creacion falla
- * con 404 porque el unico id que se mira es el del token; con el
- * comportamiento viejo la ficha se habria creado a nombre del usuario del
- * cuerpo y la respuesta habria sido 201. Es el equivalente de lo que se hizo
- * con MM-106, pero sin tener que desarmar el arreglo para comprobarlo.
+ * {@link #crear_conOtroResponsableEnElCuerpo_atribuyeLaFichaAlUsuarioDelToken()}
+ * es la que no se puede pasar por casualidad: el cuerpo nombra a un usuario y
+ * el token a otro, y la ficha queda --en la respuesta y en la tabla-- a nombre
+ * del que trae el token. Con el comportamiento viejo habria quedado a nombre
+ * del que decia el cuerpo. Es el equivalente de lo que se hizo con MM-106,
+ * pero sin tener que desarmar el arreglo para comprobarlo.
+ * <p>
+ * {@link #crear_conTokenDeUnUsuarioInexistente_cortaConUn401YNoGuardaNada()}
+ * cubre el extremo: un token cuya cuenta no existe. Daba 404 --el del
+ * responsable que el servicio no encontraba-- y hoy da 401, porque
+ * {@code VerificacionDeCuentaActiva} lo corta en la cadena de filtros antes
+ * de llegar al controlador.
  *
  * <h2>Datos</h2>
  * Los dos usuarios y la ficha EN_REVISION se crean aqui dentro, en la
@@ -195,9 +200,19 @@ class ResponsableDesdeElTokenTest {
      * La prueba que no pasa por casualidad: el {@code sub} del token apunta a
      * un usuario que no existe y el cuerpo trae uno que si. Si el servicio
      * mirara el cuerpo, esto seria un 201.
+     * <p>
+     * <strong>Era 404 y ahora es 401.</strong> El 404 lo daba el servicio al
+     * no encontrar al responsable del token; hoy la peticion no llega tan
+     * lejos, porque {@code VerificacionDeCuentaActiva} corta en la cadena de
+     * filtros todo token cuya cuenta no exista o este desactivada. Lo que la
+     * prueba fija sigue en pie, y de hecho mas arriba: el cuerpo no sirve para
+     * suplantar a nadie, y ahora ni se mira. Que el id venga del token y no
+     * del cuerpo lo sigue demostrando
+     * {@link #crear_conOtroResponsableEnElCuerpo_atribuyeLaFichaAlUsuarioDelToken()}, con un token de una cuenta
+     * real.
      */
     @Test
-    void crear_conTokenDeUnUsuarioInexistente_falla404AunqueElCuerpoTraigaUnoValido() throws Exception {
+    void crear_conTokenDeUnUsuarioInexistente_cortaConUn401YNoGuardaNada() throws Exception {
         long n = SECUENCIA.incrementAndGet();
 
         mockMvc.perform(post("/api/especies")
@@ -205,17 +220,16 @@ class ResponsableDesdeElTokenTest {
                                 tokenDe(ID_USUARIO_INEXISTENTE, ESPECIE_CREAR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(cuerpoConCreadaPor(elOtro.getIdUsuario(), n)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.mensaje")
-                        .value("No existe el usuario creador con id " + ID_USUARIO_INEXISTENTE));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.estado").value(401));
 
-        // Y no dejo la ficha a medias: el 404 sale antes de guardar nada.
+        // Y no dejo la ficha a medias: el 401 sale antes del controlador.
         assertEquals(0,
                 especieRepository.findAll().stream()
                         .filter(especie -> especie.getNombreCientifico()
                                 .equalsIgnoreCase("Zzatribucion" + n + " especie"))
                         .count(),
-                "el 404 dejo la especie creada");
+                "el 401 dejo la especie creada");
     }
 
     // ---------- validar y publicar ----------

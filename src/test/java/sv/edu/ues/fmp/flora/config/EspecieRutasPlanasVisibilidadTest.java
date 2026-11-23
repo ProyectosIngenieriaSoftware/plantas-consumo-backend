@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import jakarta.persistence.EntityManager;
 import sv.edu.ues.fmp.flora.config.SiembraDeFichas.Ficha;
 import sv.edu.ues.fmp.flora.dto.response.UsuarioResponse;
+import sv.edu.ues.fmp.flora.repository.UsuarioRepository;
 import sv.edu.ues.fmp.flora.entity.enums.EstadoPublicacion;
 import sv.edu.ues.fmp.flora.service.EmailService;
 import sv.edu.ues.fmp.flora.service.JwtService;
@@ -106,7 +107,7 @@ class EspecieRutasPlanasVisibilidadTest {
 
     private String tokenCon(String... permisos) {
         UsuarioResponse usuario = UsuarioResponse.builder()
-                .id(999L)
+                .id(idDeUsuarioActivo())
                 .nombres("Prueba")
                 .apellidos("RutasPlanas")
                 .correo("prueba.rutasplanas@local")
@@ -415,5 +416,20 @@ class EspecieRutasPlanasVisibilidadTest {
         mockMvc.perform(get("/api/departamentos")).andExpect(status().isOk());
         mockMvc.perform(get("/api/municipios")).andExpect(status().isOk());
         mockMvc.perform(get("/api/fuentes")).andExpect(status().isOk());
+    }
+
+    /**
+     * El token de estas pruebas firma a nombre de una cuenta real y activa.
+     * <p>
+     * Antes iba un id inventado (999): daba igual, porque nadie consultaba al
+     * usuario. Con {@code VerificacionDeCuentaActiva} en la cadena ese token
+     * recibe 401, y con razon --es el mismo caso que un token de una cuenta
+     * borrada--. Ver {@link sv.edu.ues.fmp.flora.config.UsuariosDePrueba}.
+     */
+    @Autowired
+    private UsuarioRepository usuarioRepositorioDePruebas;
+
+    private Long idDeUsuarioActivo() {
+        return UsuariosDePrueba.idActivo(usuarioRepositorioDePruebas);
     }
 }

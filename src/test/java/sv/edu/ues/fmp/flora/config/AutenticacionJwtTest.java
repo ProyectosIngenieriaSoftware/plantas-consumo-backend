@@ -45,6 +45,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import jakarta.persistence.EntityManager;
 import sv.edu.ues.fmp.flora.dto.response.RolResponse;
 import sv.edu.ues.fmp.flora.dto.response.UsuarioResponse;
+import sv.edu.ues.fmp.flora.repository.UsuarioRepository;
 import sv.edu.ues.fmp.flora.entity.Rol;
 import sv.edu.ues.fmp.flora.entity.Usuario;
 import sv.edu.ues.fmp.flora.entity.UsuarioRol;
@@ -132,7 +133,7 @@ class AutenticacionJwtTest {
 
     private UsuarioResponse usuarioDePrueba() {
         return UsuarioResponse.builder()
-                .id(999L)
+                .id(idDeUsuarioActivo())
                 .nombres("Prueba")
                 .apellidos("Automatizada")
                 .correo("prueba.automatizada@local")
@@ -231,7 +232,8 @@ class AutenticacionJwtTest {
 
         Jwt token = jwtDecoder.decode(emitido.token());
 
-        assertEquals("999", token.getSubject(), "sub debe ser el id del usuario");
+        assertEquals(String.valueOf(usuario.getId()), token.getSubject(),
+                "sub debe ser el id del usuario");
         assertEquals("prueba.automatizada", token.getClaimAsString("nombreUsuario"));
         assertEquals(List.of("ADMIN"), token.getClaimAsStringList("roles"));
         assertEquals(List.of("ESPECIE_CREAR"), token.getClaimAsStringList("permisos"));
@@ -598,7 +600,7 @@ class AutenticacionJwtTest {
     @Test
     void cambioDeClave_conElIdDeOtroUsuario_devuelve403ConElFormatoDeErrorDelProyecto() throws Exception {
         mockMvc.perform(put("/api/usuarios/1/clave")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tokenDeUsuario(999L)))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tokenDeUsuario(idActivoAjenoA(1L))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CUERPO_CAMBIO_CLAVE))
                 .andExpect(status().isForbidden())
@@ -623,7 +625,7 @@ class AutenticacionJwtTest {
     @Test
     void cambioDeClave_sobreUnIdAjenoQueNiExiste_devuelve403YNo404() throws Exception {
         mockMvc.perform(put("/api/usuarios/99999/clave")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tokenDeUsuario(999L)))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tokenDeUsuario(idActivoAjenoA(1L))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CUERPO_CAMBIO_CLAVE))
                 .andExpect(status().isForbidden());
@@ -637,7 +639,7 @@ class AutenticacionJwtTest {
      */
     @Test
     void cambioDeClave_sobreCuentaAjena_noDistingueSiLaClaveActualEraCorrecta() throws Exception {
-        String token = tokenDeUsuario(999L);
+        String token = tokenDeUsuario(idActivoAjenoA(1L));
 
         mockMvc.perform(put("/api/usuarios/1/clave")
                         .header(HttpHeaders.AUTHORIZATION, bearer(token))
@@ -758,5 +760,34 @@ class AutenticacionJwtTest {
         return jwtEncoder
                 .encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
+    }
+
+    /**
+     * El token de estas pruebas firma a nombre de una cuenta real y activa.
+     * <p>
+     * Antes iba un id inventado (999): daba igual, porque nadie consultaba al
+     * usuario. Con {@code VerificacionDeCuentaActiva} en la cadena ese token
+     * recibe 401, y con razon --es el mismo caso que un token de una cuenta
+     * borrada--. Ver {@link sv.edu.ues.fmp.flora.config.UsuariosDePrueba}.
+     */
+    @Autowired
+    private UsuarioRepository usuarioRepositorioDePruebas;
+
+    private Long idDeUsuarioActivo() {
+        return UsuariosDePrueba.idActivo(usuarioRepositorioDePruebas);
+    }
+
+    /**
+     * Una cuenta activa que no sea la del id dado, para las pruebas del guard
+     * de propiedad del cambio de clave.
+     * <p>
+     * Antes esos tokens iban a nombre del id 999: con
+     * {@code VerificacionDeCuentaActiva} en la cadena eso ahora es un 401 --el
+     * del token de una cuenta que no existe-- y taparia el 403 que estas
+     * pruebas quieren medir. El token tiene que ser de una cuenta real, y
+     * distinta de la que la peticion ataca.
+     */
+    private Long idActivoAjenoA(Long excluido) {
+        return UsuariosDePrueba.idActivoDistintoDe(usuarioRepositorioDePruebas, excluido);
     }
 }
