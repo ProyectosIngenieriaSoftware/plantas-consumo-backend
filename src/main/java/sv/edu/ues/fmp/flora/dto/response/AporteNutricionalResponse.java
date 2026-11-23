@@ -29,5 +29,13 @@ public class AporteNutricionalResponse {
     private String unidadMedida;
     private String porcionReferencia;
     private String observacion;
+
+    /**
+     * Baja logica: {@code false} es un aporte retirado. Sale en la respuesta
+     * para que la pantalla de administracion pueda distinguir lo vigente de lo
+     * retirado --y ofrecer el {@code PATCH /{id}/activar}-- sin tener que
+     * pedir el detalle de cada uno.
+     */
+    private Boolean activo;
 }
 

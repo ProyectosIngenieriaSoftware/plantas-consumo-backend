@@ -21,6 +21,14 @@ public class AporteNutricionalMapper {
                 .unidadMedida(request.getUnidadMedida() != null && !request.getUnidadMedida().trim().isEmpty() ? request.getUnidadMedida().trim() : null)
                 .porcionReferencia(request.getPorcionReferencia().trim())
                 .observacion(request.getObservacion() != null && !request.getObservacion().trim().isEmpty() ? request.getObservacion().trim() : null)
+                // Un aporte nuevo nace activo, y el cuerpo no puede decir otra
+                // cosa: AporteNutricionalRequest no tiene campo activo. Se fija
+                // aqui a mano en lugar de confiar en el @Builder.Default de la
+                // entidad, por lo que se encontro en beneficio --un
+                // @Builder.Default no sobrevive a la deserializacion de
+                // Jackson-- y para que el valor no dependa de por que camino se
+                // construyo el objeto.
+                .activo(true)
                 .build();
     }
 
@@ -32,6 +40,10 @@ public class AporteNutricionalMapper {
         entity.setUnidadMedida(request.getUnidadMedida() != null && !request.getUnidadMedida().trim().isEmpty() ? request.getUnidadMedida().trim() : null);
         entity.setPorcionReferencia(request.getPorcionReferencia().trim());
         entity.setObservacion(request.getObservacion() != null && !request.getObservacion().trim().isEmpty() ? request.getObservacion().trim() : null);
+        // activo no se toca a proposito: el PUT edita la medicion, no el
+        // estado. Quien da de baja es DELETE /{id} y quien reactiva es
+        // PATCH /{id}/activar. Si el update lo pusiera en true, editar un
+        // aporte retirado lo devolveria al catalogo sin que nadie lo pidiera.
     }
 
     public AporteNutricionalResponse toResponse(AporteNutricional entity) {
@@ -48,6 +60,7 @@ public class AporteNutricionalMapper {
                 .unidadMedida(entity.getUnidadMedida())
                 .porcionReferencia(entity.getPorcionReferencia())
                 .observacion(entity.getObservacion())
+                .activo(entity.getActivo())
                 .build();
     }
 }

@@ -53,4 +53,25 @@ public class AporteNutricional {
 
     @Column(name = "observacion", columnDefinition = "text")
     private String observacion;
+
+    /**
+     * Baja logica, como en el resto del catalogo. La columna la agrega
+     * {@code V21}: {@code boolean NOT NULL DEFAULT true}, asi que las filas
+     * que ya estaban quedaron activas.
+     * <p>
+     * El {@code @Builder.Default} cubre la construccion por builder --que es
+     * por donde pasa {@code AporteNutricionalMapper.toEntity}-- pero
+     * <strong>no</strong> es de lo que depende que un aporte nuevo nazca
+     * activo: el mapper lo fija a {@code true} a mano. La razon es la que se
+     * encontro en beneficio: un {@code @Builder.Default} no sobrevive a la
+     * deserializacion de Jackson, porque Jackson construye con el constructor
+     * vacio y ese camino no pasa por el builder. Aqui no se nota, porque
+     * {@code AporteNutricionalRequest} <strong>no</strong> tiene campo
+     * {@code activo} --el cliente no puede pedir el estado al crear, que es
+     * justo lo que pedia el cambio-- pero dejarlo fijado en el mapper evita
+     * que el dia que alguien agregue el campo al DTO herede el problema.
+     */
+    @Builder.Default
+    @Column(name = "activo", nullable = false)
+    private Boolean activo = true;
 }

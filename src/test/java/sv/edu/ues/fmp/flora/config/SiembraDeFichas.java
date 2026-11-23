@@ -217,6 +217,12 @@ public final class SiembraDeFichas {
                 .cantidad(new BigDecimal("1.0000"))
                 .unidadMedida("g")
                 .porcionReferencia("100 g")
+                // Explicito desde que aporte_nutricional tiene baja logica
+                // (V21). El @Builder.Default de la entidad ya lo pondria en
+                // true, pero las pruebas de visibilidad cuentan con que este
+                // aporte se vea, y eso no deberia depender de un detalle de
+                // Lombok: el listado por parte ahora filtra por activo.
+                .activo(true)
                 .build());
 
         ParteBeneficio parteBeneficio = sembrarParteBeneficio(parte);

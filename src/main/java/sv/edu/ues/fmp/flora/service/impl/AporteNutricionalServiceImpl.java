@@ -52,7 +52,18 @@ public class AporteNutricionalServiceImpl implements AporteNutricionalService {
             throw parteNoEncontrada(idEspecieParte);
         }
 
-        return aporteRepository.findByEspecieParteComestibleIdEspecieParteOrderByIdAporteAsc(idEspecieParte)
+        // Al filtro de visibilidad del padre se suma el de la baja logica del
+        // propio aporte, y este no tiene bandera que lo apague: un aporte
+        // retirado no se pinta en la ficha publica. Son dos preguntas
+        // distintas --si la ficha se puede ver, y si el renglon sigue
+        // vigente-- y las dos tienen que dar si.
+        //
+        // Una parte visible con todos sus aportes retirados sigue siendo un
+        // 200 con lista vacia, no un 404: la parte existe y se puede ver, es
+        // su contenido el que esta vacio. El 404 de arriba habla de la parte,
+        // y confundirlos delataria por omision que esa parte tuvo aportes.
+        return aporteRepository
+                .findByEspecieParteComestibleIdEspecieParteAndActivoTrueOrderByIdAporteAsc(idEspecieParte)
                 .stream().map(mapper::toResponse).toList();
     }
 
@@ -70,6 +81,19 @@ public class AporteNutricionalServiceImpl implements AporteNutricionalService {
     @Transactional(readOnly = true)
     public List<AporteNutricionalResponse> listarPorNutriente(Long idNutriente) {
         return aporteRepository.findByNutrienteIdNutrienteOrderByIdAporteAsc(idNutriente)
+                .stream().map(mapper::toResponse).toList();
+    }
+
+    /**
+     * El mismo listado administrativo, sin los dados de baja. Es la cara de
+     * {@code ?soloActivos=true}; sin la bandera sigue respondiendo
+     * {@link #listarPorNutriente(Long)}, con los retirados incluidos, porque
+     * es desde esta pantalla desde donde se los reactiva.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<AporteNutricionalResponse> listarActivosPorNutriente(Long idNutriente) {
+        return aporteRepository.findByNutrienteIdNutrienteAndActivoTrueOrderByIdAporteAsc(idNutriente)
                 .stream().map(mapper::toResponse).toList();
     }
 
@@ -136,11 +160,47 @@ public class AporteNutricionalServiceImpl implements AporteNutricionalService {
         return mapper.toResponse(entidad);
     }
 
+    /**
+     * Baja logica, no borrado. Antes aqui habia un {@code delete()} y el aporte
+     * desaparecia de la base: se perdia una medicion citada a una fuente y un
+     * borrado por error solo se arreglaba volviendo a teclearla. Ahora la fila
+     * se queda con {@code activo = false}; lo que cambia es que deja de
+     * pintarse en la ficha publica.
+     * <p>
+     * Es el patron del resto del catalogo: igual que
+     * {@code DELETE /api/beneficios/{id}}, {@code /api/habitats/{id}} y
+     * {@code /api/partes-planta/{id}}. Se revierte con {@link #activar(Long)}.
+     */
     @Override
     @Transactional
-    public void eliminar(Long id) {
+    public void desactivar(Long id) {
         AporteNutricional entidad = buscarOFallar(id);
-        aporteRepository.delete(entidad);
+        entidad.setActivo(false);
+        aporteRepository.save(entidad);
+    }
+
+    /**
+     * Devuelve al catalogo un aporte retirado.
+     * <p>
+     * Idempotente, como sus hermanos: activar uno que ya esta activo no es un
+     * error, no cambia nada y responde igual.
+     * <p>
+     * No pasa por {@code VisibilidadDeEspecie}, al contrario que
+     * {@link #obtenerPorId(Long)}: es una operacion de escritura, protegida
+     * por {@code NUTRICION_GESTIONAR}, y quien gestiona el contenido trabaja
+     * precisamente sobre fichas que no estan publicadas todavia.
+     */
+    @Override
+    @Transactional
+    public AporteNutricionalResponse activar(Long id) {
+        AporteNutricional entidad = buscarOFallar(id);
+
+        if (!Boolean.TRUE.equals(entidad.getActivo())) {
+            entidad.setActivo(true);
+            aporteRepository.save(entidad);
+        }
+
+        return mapper.toResponse(entidad);
     }
 
     private AporteNutricional buscarOFallar(Long id) {
