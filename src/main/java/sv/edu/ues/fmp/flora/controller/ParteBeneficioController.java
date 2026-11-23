@@ -78,7 +78,9 @@ public class ParteBeneficioController {
      */
     @Operation(summary = "Listar los beneficios de una parte comestible",
             description = "Listado público por parte comestible: el que usa la ficha del catálogo. "
-                    + "Devuelve solo los registros con activa=true, el mismo criterio de /activas. "
+                    + "Devuelve solo los registros vigentes: la asociación con activa=true y, además, "
+                    + "el beneficio del catálogo activo, de modo que un beneficio dado de baja con "
+                    + "DELETE /api/beneficios/{id} desaparece de la ficha pública. "
                     + "Si la parte existe y no tiene beneficios, devuelve una lista vacía. "
                     + "Los beneficios de una ficha sin publicar solo se ven con el permiso ESPECIE_CONSULTAR; "
                     + "sin él responde el mismo 404 que una parte inexistente.")

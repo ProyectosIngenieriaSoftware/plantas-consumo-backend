@@ -10,7 +10,8 @@ public interface ParteBeneficioService {
     List<ParteBeneficioResponse> listarActivas();
 
     /**
-     * Los beneficios activos de una parte comestible concreta.
+     * Los beneficios vigentes de una parte comestible concreta: la asociacion
+     * activa y, ademas, el beneficio del catalogo activo.
      * <p>
      * El listado por padre del modulo, el que le faltaba a la ficha publica. Al
      * contrario que los dos de arriba, no recorre todas las especies: entra por

@@ -74,11 +74,19 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
      * {@code GET /api/epocas-cosecha?idEspecieParte={id}}, salvo que aqui la
      * ruta por padre no existia.
      *
-     * <h2>El criterio de estado</h2>
-     * Solo {@code activa = true}, el mismo que
+     * <h2>El criterio de estado: dos banderas</h2>
+     * {@code activa = true} en la asociacion, el mismo que
      * {@link #listarActivas()}: lo publico no pinta las asociaciones dadas de
-     * baja. Las inactivas siguen siendo visibles por los dos listados
-     * administrativos y por {@link #obtenerPorId(Long, Long)}.
+     * baja. Y ademas {@code beneficio.activo = true}, que es lo que pide la
+     * baja logica del catalogo: desde que {@code DELETE /api/beneficios/{id}}
+     * no borra la fila, un beneficio retirado deja intactas sus asociaciones
+     * --nadie las toca-- y sin esa segunda condicion seguiria saliendo en la
+     * ficha publica por esta puerta. Un beneficio se retira en un solo sitio,
+     * su propio catalogo, y desaparece de todas las fichas.
+     * <p>
+     * Las dos cosas siguen siendo visibles por los dos listados
+     * administrativos y por {@link #obtenerPorId(Long, Long)}, que es lo que
+     * permite reactivarlas.
      *
      * <h2>El filtro de visibilidad</h2>
      * La parte de una ficha sin publicar se responde como una parte que no
@@ -105,7 +113,7 @@ public class ParteBeneficioServiceImpl implements ParteBeneficioService {
         }
 
         return parteBeneficioRepository
-                .findByEspecieParteComestibleIdEspecieParteAndActivaTrueOrderByIdIdBeneficioAsc(
+                .findByEspecieParteComestibleIdEspecieParteAndActivaTrueAndBeneficioActivoTrueOrderByIdIdBeneficioAsc(
                         idEspecieParte
                 )
                 .stream()

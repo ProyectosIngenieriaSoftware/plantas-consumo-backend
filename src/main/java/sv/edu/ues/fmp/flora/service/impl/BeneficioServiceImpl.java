@@ -35,6 +35,16 @@ public class BeneficioServiceImpl implements BeneficioService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<BeneficioResponse> listarActivos() {
+
+        return beneficioRepository.findByActivoTrue()
+                .stream()
+                .map(beneficioMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public BeneficioResponse obtenerPorId(Long id) {
 
         Beneficio beneficio = buscarPorId(id);
@@ -131,11 +141,38 @@ public class BeneficioServiceImpl implements BeneficioService {
     }
 
     @Override
-    public void eliminar(Long id) {
+    public void desactivar(Long id) {
 
         Beneficio beneficio = buscarPorId(id);
 
-        beneficioRepository.delete(beneficio);
+        /*
+         * Baja logica, no borrado. Antes aqui habia un delete() y eso hacia
+         * imposible dar de baja un beneficio ya usado por alguna ficha: la FK
+         * de parte_beneficio saltaba y el error salia como un 409 generico.
+         * Ahora la fila se queda y las fichas que la citan no pierden nada;
+         * lo que cambia es que deja de ofrecerse como vigente.
+         */
+        beneficio.setActivo(false);
+
+        beneficioRepository.save(beneficio);
+    }
+
+    @Override
+    public BeneficioResponse activar(Long id) {
+
+        Beneficio beneficio = buscarPorId(id);
+
+        /*
+         * Idempotente: activar uno que ya esta activo no es un error.
+         */
+        if (!Boolean.TRUE.equals(beneficio.getActivo())) {
+
+            beneficio.setActivo(true);
+
+            beneficioRepository.save(beneficio);
+        }
+
+        return beneficioMapper.toResponse(beneficio);
     }
 
     private Beneficio buscarPorId(Long id) {
