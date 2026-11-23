@@ -1,8 +1,8 @@
 package sv.edu.ues.fmp.flora.controller;
 
 import java.util.List;
-
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
@@ -97,10 +97,7 @@ public class EspecieController {
                     + "activa, validadaPor, publicadaPor o fechas enviados en el cuerpo son "
                     + "ignorados silenciosamente; el flujo editorial se gestiona con los "
                     + "endpoints PATCH dedicados (enviar-revision, validar, publicar, "
-                    + "rechazar). Editar el contenido sí invalida la revisión previa: una "
-                    + "ficha PUBLICADA vuelve a EN_REVISION y pierde validación y "
-                    + "publicación, y una ya validada pierde la validación. Hay que "
-                    + "revalidar y volver a publicar.")
+                    + "rechazar).")
     @PreAuthorize("hasAuthority('ESPECIE_CREAR')")
     @PostMapping
     public ResponseEntity<EspecieResponse> crear(@Valid @RequestBody EspecieRequest request) {
@@ -108,14 +105,33 @@ public class EspecieController {
         return ResponseEntity.status(HttpStatus.CREATED).body(creada);
     }
 
-    @Operation(summary = "Actualizar los datos editables de una especie y su taxonomía")
+    @Operation(summary = "Actualizar los datos editables de una especie y su taxonomía",
+            description = "Editar el contenido invalida la revisión previa: una ficha "
+                    + "PUBLICADA vuelve a EN_REVISION y pierde validación y publicación, y "
+                    + "una ya validada pierde la validación. Hay que revalidar y volver a "
+                    + "publicar. La lista de nombres comunes se ignora aunque venga en el "
+                    + "cuerpo: se gestiona por sus propios endpoints.\n\n"
+                    + "Sobre una ficha PUBLICADA hay que mandar confirmar=true, porque la "
+                    + "edición la saca del catálogo público. Sin él no se cambia nada y "
+                    + "responde 409 con error=\"Confirmación requerida\", que es el campo "
+                    + "por el que el cliente lo distingue de un conflicto de estado normal "
+                    + "(error=\"Transición de estado no válida\") y puede ofrecer reenviar "
+                    + "confirmando. En los demás estados el parámetro no hace falta.")
+    @ApiResponse(responseCode = "409",
+            description = "error=\"Confirmación requerida\": la ficha está publicada y no "
+                    + "vino confirmar=true, no se cambió nada. O error=\"Conflicto\": ya "
+                    + "existe otra especie con ese nombre científico o esa clasificación")
     @PreAuthorize("hasAuthority('ESPECIE_EDITAR')")
     @PutMapping("/{id}")
     public ResponseEntity<EspecieResponse> actualizar(
             @PathVariable Long id,
-            @Valid @RequestBody EspecieRequest request) {
+            @Valid @RequestBody EspecieRequest request,
+            @Parameter(description = "Acepta que editar una ficha publicada la saque del "
+                    + "catálogo público y la devuelva a revisión. Solo se mira cuando la "
+                    + "ficha está PUBLICADA.")
+            @RequestParam(defaultValue = "false") boolean confirmar) {
 
-        return ResponseEntity.ok(especieService.actualizar(id, request));
+        return ResponseEntity.ok(especieService.actualizar(id, request, confirmar));
     }
 
     /**
@@ -125,14 +141,25 @@ public class EspecieController {
     @Operation(summary = "Rectificar solo la clasificación taxonómica de una especie",
             description = "Es una edición de contenido: invalida la revisión previa igual "
                     + "que el PUT. Una ficha PUBLICADA vuelve a EN_REVISION y pierde "
-                    + "validación y publicación; una ya validada pierde la validación.")
+                    + "validación y publicación; una ya validada pierde la validación.\n\n"
+                    + "Y pide confirmar=true igual que el PUT cuando la ficha está "
+                    + "PUBLICADA: sin él no se cambia nada y responde 409 con "
+                    + "error=\"Confirmación requerida\".")
+    @ApiResponse(responseCode = "409",
+            description = "error=\"Confirmación requerida\": la ficha está publicada y no "
+                    + "vino confirmar=true, no se cambió nada. O error=\"Conflicto\": otra "
+                    + "especie ya tiene esa clasificación")
     @PreAuthorize("hasAuthority('ESPECIE_EDITAR')")
     @PatchMapping("/{id}/taxonomia")
     public ResponseEntity<EspecieResponse> actualizarTaxonomia(
             @PathVariable Long id,
-            @Valid @RequestBody TaxonomiaRequest request) {
+            @Valid @RequestBody TaxonomiaRequest request,
+            @Parameter(description = "Acepta que editar una ficha publicada la saque del "
+                    + "catálogo público y la devuelva a revisión. Solo se mira cuando la "
+                    + "ficha está PUBLICADA.")
+            @RequestParam(defaultValue = "false") boolean confirmar) {
 
-        return ResponseEntity.ok(especieService.actualizarTaxonomia(id, request));
+        return ResponseEntity.ok(especieService.actualizarTaxonomia(id, request, confirmar));
     }
 
     @Operation(summary = "Enviar la ficha a revisión")

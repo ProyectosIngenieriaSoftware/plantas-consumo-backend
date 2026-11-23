@@ -62,18 +62,32 @@ public interface EspecieService {
      * Editar invalida la revision previa: una ficha PUBLICADA vuelve a
      * EN_REVISION y pierde validacion y publicacion, y una ya validada pierde
      * la validacion. El detalle y el motivo, en {@code invalidarRevisionPrevia}.
+     * <p>
+     * Si la ficha esta PUBLICADA, {@code confirmar} tiene que venir en
+     * {@code true}: sacarla del catalogo publico no debe pasar en silencio. Con
+     * {@code false} no se cambia nada y sale un 409 con
+     * {@code error: "Confirmación requerida"}. En los demas estados el
+     * parametro se ignora. Ver {@code exigirConfirmacionSiEstaPublicada}.
+     *
+     * @param confirmar que quien llama acepta la consecuencia de editar una
+     *                  ficha publicada
      */
-    EspecieResponse actualizar(Long id, EspecieRequest request);
+    EspecieResponse actualizar(Long id, EspecieRequest request, boolean confirmar);
 
     /**
      * Rectifica solo la clasificacion taxonomica, sin tocar el resto de la
      * ficha. Evita tener que reenviar la especie completa para corregir un
      * genero o una familia.
      * <p>
-     * Es una edicion de contenido, asi que invalida la revision previa igual
-     * que {@link #actualizar(Long, EspecieRequest)}.
+     * Es una edicion de contenido, asi que invalida la revision previa y pide
+     * confirmacion sobre una ficha publicada, igual que
+     * {@link #actualizar(Long, EspecieRequest, boolean)}.
+     *
+     * @param confirmar que quien llama acepta la consecuencia de editar una
+     *                  ficha publicada
      */
-    EspecieResponse actualizarTaxonomia(Long idEspecie, TaxonomiaRequest request);
+    EspecieResponse actualizarTaxonomia(Long idEspecie, TaxonomiaRequest request,
+            boolean confirmar);
 
     EspecieResponse enviarARevision(Long id);
 

@@ -19,6 +19,7 @@ import sv.edu.ues.fmp.flora.entity.Especie;
 import sv.edu.ues.fmp.flora.entity.Taxonomia;
 import sv.edu.ues.fmp.flora.entity.Usuario;
 import sv.edu.ues.fmp.flora.entity.enums.EstadoPublicacion;
+import sv.edu.ues.fmp.flora.exception.ConfirmacionRequeridaException;
 import sv.edu.ues.fmp.flora.exception.EstadoInvalidoException;
 import sv.edu.ues.fmp.flora.exception.RecursoDuplicadoException;
 import sv.edu.ues.fmp.flora.exception.RecursoNoEncontradoException;
@@ -211,7 +212,7 @@ public class EspecieServiceImpl implements EspecieService {
 
     @Override
     @Transactional
-    public EspecieResponse actualizar(Long id, EspecieRequest request) {
+    public EspecieResponse actualizar(Long id, EspecieRequest request, boolean confirmar) {
         normalizar(request);
 
         Especie entidad = buscarOFallar(id);
@@ -236,6 +237,10 @@ public class EspecieServiceImpl implements EspecieService {
         // descripcion borraria de hecho todos los nombres que no reenviara.
         // Esa lista se gestiona por los endpoints propios del modulo, que
         // ademas saben aplicar sus reglas una por una.
+        // Ultima puerta antes de tocar la entidad: si la ficha esta publicada,
+        // quien llama tiene que haber aceptado que se la saca del catalogo.
+        exigirConfirmacionSiEstaPublicada(entidad, confirmar);
+
         especieMapper.updateEntity(entidad, request);
         taxonomiaMapper.updateEntity(taxonomia, request.getTaxonomia());
 
@@ -391,7 +396,8 @@ public class EspecieServiceImpl implements EspecieService {
 
     @Override
     @Transactional
-    public EspecieResponse actualizarTaxonomia(Long idEspecie, TaxonomiaRequest request) {
+    public EspecieResponse actualizarTaxonomia(Long idEspecie, TaxonomiaRequest request,
+            boolean confirmar) {
         normalizar(request);
 
         Especie entidad = buscarOFallar(idEspecie);
@@ -404,6 +410,10 @@ public class EspecieServiceImpl implements EspecieService {
         // que se anticipa uk_taxonomia igual que en crear(), excluyendo la
         // taxonomia que esta especie ya tiene.
         validarClasificacionUnica(request, taxonomia.getIdTaxonomia());
+
+        // Misma puerta que en actualizar(), y en el mismo sitio: despues de las
+        // comprobaciones del cuerpo, antes de tocar nada.
+        exigirConfirmacionSiEstaPublicada(entidad, confirmar);
 
         taxonomiaMapper.updateEntity(taxonomia, request);
 
@@ -627,6 +637,45 @@ public class EspecieServiceImpl implements EspecieService {
             respuestas.add(especieMapper.toResponse(entidad));
         }
         return respuestas;
+    }
+
+    /**
+     * Editar una ficha PUBLICADA tiene una consecuencia que no debe pasar en
+     * silencio: {@link #invalidarRevisionPrevia(Especie)} la saca del catalogo
+     * publico y la devuelve a revision. Asi que se exige que quien llama lo
+     * haya aceptado, con {@code ?confirmar=true}; si no, la peticion se rechaza
+     * entera y no se cambia nada.
+     * <p>
+     * Solo aplica a PUBLICADA. En BORRADOR, EN_REVISION y RECHAZADA la ficha no
+     * esta en el catalogo y no hay nada que avisar, asi que editar no pide
+     * confirmacion --tampoco cuando esta EN_REVISION ya validada: ahi se pierde
+     * la validacion, pero la ficha no era publica y volver a validar es parte
+     * normal de la revision.
+     *
+     * <h2>Por que se comprueba al final y no al entrar</h2>
+     * Va despues de las comprobaciones del cuerpo --nombre cientifico duplicado
+     * y {@code uk_taxonomia}-- y justo antes de la primera escritura. Puesta al
+     * entrar, un envio con el nombre duplicado pediria confirmar y, al
+     * reenviarlo confirmando, fallaria por el duplicado: se le habria pedido al
+     * usuario que aceptara una consecuencia que no iba a ocurrir. En este orden,
+     * si se pide confirmacion es porque el reenvio con {@code confirmar=true}
+     * va a funcionar.
+     * <p>
+     * La autorizacion es anterior a todo esto, en la cadena de filtros y el
+     * {@code @PreAuthorize} del controlador: sin {@code ESPECIE_EDITAR} sale
+     * 403 y nunca se llega a hablar de confirmar.
+     *
+     * @param confirmar lo que trajo el parametro de query; {@code false} si no
+     *                  venia
+     * @throws ConfirmacionRequeridaException 409 con
+     *                                        {@code error: "Confirmación requerida"}
+     */
+    private void exigirConfirmacionSiEstaPublicada(Especie entidad, boolean confirmar) {
+        if (entidad.getEstadoPublicacion() == EstadoPublicacion.PUBLICADA && !confirmar) {
+            throw new ConfirmacionRequeridaException(
+                    "Esta ficha está publicada; al editarla saldrá del catálogo público y "
+                            + "volverá a revisión. Reenvía con confirmar=true para continuar.");
+        }
     }
 
     /**

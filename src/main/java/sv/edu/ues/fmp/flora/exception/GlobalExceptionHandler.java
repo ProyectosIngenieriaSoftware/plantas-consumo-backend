@@ -151,6 +151,35 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Falta confirmar una consecuencia -> 409 CONFLICT, con un {@code error}
+     * propio.
+     * <p>
+     * Sale con el mismo codigo que {@link EstadoInvalidoException} porque
+     * tambien es un conflicto con el estado del recurso, pero el campo
+     * {@code error} dice "Confirmación requerida" y no "Transición de estado no
+     * válida". Esa diferencia es deliberada y es contrato: el cliente decide si
+     * ofrecer "reenviar confirmando" mirando ese campo, sin tener que parsear
+     * el mensaje. Ver {@link ConfirmacionRequeridaException}.
+     */
+    @ExceptionHandler(ConfirmacionRequeridaException.class)
+    public ResponseEntity<ErrorResponse> manejarConfirmacionRequerida(
+            ConfirmacionRequeridaException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.CONFLICT.value())
+                .error("Confirmación requerida")
+                .mensaje(ex.getMessage())
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(cuerpo);
+    }
+
+    /**
      * Login fallido -> 401 UNAUTHORIZED.
      */
     /**

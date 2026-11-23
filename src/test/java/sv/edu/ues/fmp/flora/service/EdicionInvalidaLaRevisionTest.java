@@ -121,6 +121,10 @@ class EdicionInvalidaLaRevisionTest {
         Ficha ficha = sembrar(EstadoPublicacion.PUBLICADA);
 
         mockMvc.perform(put("/api/especies/" + ficha.id())
+                        // La ficha esta publicada: hay que aceptar que sale del
+                        // catalogo. Sin esto responde 409 y no edita nada, que es
+                        // lo que fija ConfirmacionAlEditarPublicadaTest.
+                        .param("confirmar", "true")
                         .header(HttpHeaders.AUTHORIZATION, token(ESPECIE_EDITAR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(cuerpoPut(ficha, "Descripción corregida tras publicar.")))
@@ -149,6 +153,7 @@ class EdicionInvalidaLaRevisionTest {
         Ficha ficha = sembrar(EstadoPublicacion.PUBLICADA);
 
         mockMvc.perform(patch("/api/especies/" + ficha.id() + "/taxonomia")
+                        .param("confirmar", "true")
                         .header(HttpHeaders.AUTHORIZATION, token(ESPECIE_EDITAR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(cuerpoTaxonomia(ficha, "Corregidaceae")))
@@ -178,6 +183,7 @@ class EdicionInvalidaLaRevisionTest {
                         + "el resto de la prueba no demostraria nada");
 
         mockMvc.perform(put("/api/especies/" + ficha.id())
+                        .param("confirmar", "true")
                         .header(HttpHeaders.AUTHORIZATION, token(ESPECIE_EDITAR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(cuerpoPut(ficha, "Contenido que nadie ha revisado todavía.")))
@@ -482,8 +488,15 @@ class EdicionInvalidaLaRevisionTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * Edita, sea cual sea el estado. Manda siempre {@code confirmar=true}: en
+     * una ficha publicada hace falta, y en los demas estados se ignora, asi que
+     * el ayudante sirve igual para todos. Que sin confirmar NO se edite es otra
+     * cosa, y la fija {@code ConfirmacionAlEditarPublicadaTest}.
+     */
     private void editar(Ficha ficha, String descripcion) throws Exception {
         mockMvc.perform(put("/api/especies/" + ficha.id())
+                        .param("confirmar", "true")
                         .header(HttpHeaders.AUTHORIZATION, token(ESPECIE_EDITAR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(cuerpoPut(ficha, descripcion)))
