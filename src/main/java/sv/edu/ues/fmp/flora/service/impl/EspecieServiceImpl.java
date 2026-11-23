@@ -239,12 +239,19 @@ public class EspecieServiceImpl implements EspecieService {
         especieMapper.updateEntity(entidad, request);
         taxonomiaMapper.updateEntity(taxonomia, request.getTaxonomia());
 
+        // Editar el contenido invalida la revision previa. Antes este metodo no
+        // tocaba el estado ni los campos de control --"eso solo cambia por las
+        // transiciones", decia aqui-- y por eso una ficha PUBLICADA se podia
+        // reescribir sin consecuencia, quedando publicada con un contenido que
+        // nadie reviso.
+        invalidarRevisionPrevia(entidad);
+
         // No se llama a save(): dentro de la transaccion la entidad esta
         // gestionada por el contexto de persistencia, asi que Hibernate detecta
         // los cambios (dirty checking) y emite el UPDATE al hacer flush, que
-        // responderActualizada() adelanta.
-        // Ni el estado, ni las fechas, ni los usuarios de validacion o
-        // publicacion se tocan aqui: eso solo cambia por las transiciones.
+        // responderActualizada() adelanta. En ese mismo flush viajan el
+        // contenido nuevo y los campos de control que se acaban de limpiar, de
+        // modo que la fila nunca queda a medio camino entre los dos.
         return responderActualizada(entidad, request.getTaxonomia());
     }
 
@@ -290,6 +297,14 @@ public class EspecieServiceImpl implements EspecieService {
                             + ". Para asignar un nuevo validador, rechácela primero.");
         }
 
+        // Compuerta de familia: decision del equipo con Agronomia. El revisor
+        // no aprueba una ficha cuya taxonomia no diga a que familia pertenece.
+        // Va despues de las dos guardas de arriba a proposito: el estado y la
+        // doble validacion son diagnosticos mas informativos para quien llama,
+        // y esta es una precondicion de datos, no de transicion.
+        exigirFamilia(entidad,
+                "No se puede validar: la familia de la taxonomía es obligatoria");
+
         // El validador es quien trae el token. Antes llegaba en la query, de
         // modo que quien tenia ESPECIE_VALIDAR podia atribuirle la validacion
         // a cualquier otro usuario.
@@ -326,6 +341,15 @@ public class EspecieServiceImpl implements EspecieService {
             throw new EstadoInvalidoException(
                     "La especie debe ser validada antes de publicarse");
         }
+
+        // La compuerta que de verdad garantiza que lo publicado tenga familia.
+        // Repetirla aqui no es redundante: validar() ya la exige, pero ni
+        // actualizar() ni actualizarTaxonomia() tienen guarda de estado y
+        // TaxonomiaMapper.updateEntity escribe familia tal cual, null incluido,
+        // asi que entre validar y publicar un ESPECIE_EDITAR puede dejarla en
+        // blanco. Sin esta comprobacion esa ficha se publicaria sin familia.
+        exigirFamilia(entidad,
+                "No se puede publicar: la familia de la taxonomía es obligatoria");
 
         // Mismo criterio que el validador: sale del token.
         Usuario publicador = buscarUsuarioOFallar(usuarioAutenticado.id(), "publicador");
@@ -382,6 +406,11 @@ public class EspecieServiceImpl implements EspecieService {
         validarClasificacionUnica(request, taxonomia.getIdTaxonomia());
 
         taxonomiaMapper.updateEntity(taxonomia, request);
+
+        // Rectificar la clasificacion es editar contenido, asi que invalida la
+        // revision previa igual que actualizar(): la familia o el genero con
+        // que se aprobo la ficha son parte de lo que el revisor aprobo.
+        invalidarRevisionPrevia(entidad);
 
         // No se llama a save(): tanto la especie como su taxonomia estan
         // gestionadas por el contexto de persistencia, asi que Hibernate emite
@@ -598,6 +627,98 @@ public class EspecieServiceImpl implements EspecieService {
             respuestas.add(especieMapper.toResponse(entidad));
         }
         return respuestas;
+    }
+
+    /**
+     * Editar el contenido de una ficha invalida la revision previa: lo que el
+     * revisor aprobo ya no es lo que dice la ficha. Decision del equipo con
+     * Agronomia, y se aplica despues de guardar los cambios en
+     * {@link #actualizar(Long, EspecieRequest)} y
+     * {@link #actualizarTaxonomia(Long, TaxonomiaRequest)}.
+     *
+     * <h2>Que pasa en cada estado</h2>
+     * <ul>
+     *   <li><strong>PUBLICADA</strong> -&gt; EN_REVISION, y se limpian los
+     *       cuatro campos: {@code publicadaPor}, {@code fechaPublicacion},
+     *       {@code validadaPor} y {@code fechaValidacion}. La ficha sale del
+     *       catalogo publico --{@code listarPublicadas()} filtra por estado--
+     *       hasta que se revalide y se vuelva a publicar.</li>
+     *   <li><strong>EN_REVISION ya validada</strong> -&gt; se limpian
+     *       {@code validadaPor} y {@code fechaValidacion}; el estado sigue
+     *       EN_REVISION, porque ahi ya estaba. Tiene que volver a pasar por
+     *       {@link #validar(Long)}.</li>
+     *   <li><strong>BORRADOR, EN_REVISION sin validar y RECHAZADA</strong>
+     *       -&gt; sin cambio: no hay ninguna revision previa que invalidar.</li>
+     * </ul>
+     *
+     * <h2>Por que no se comprueba si el contenido cambio de verdad</h2>
+     * Un PUT que reenvie los mismos valores cuenta igual como edicion. Saberlo
+     * pediria comparar campo por campo el contenido y la taxonomia antes y
+     * despues, y el resultado seria una regla que depende de si el cliente
+     * mando exactamente lo que ya habia: mas facil de romper sin darse cuenta
+     * que la version que invalida siempre. Quien solo quiera leer la ficha
+     * tiene el GET.
+     *
+     * <h2>Los CHECK de la tabla</h2>
+     * Los dos quedan satisfechos. {@code ck_especie_publicacion} solo exige los
+     * tres campos de publicacion cuando el estado es PUBLICADA, y aqui se sale
+     * de ese estado en la misma operacion; {@code ck_especie_validacion} es
+     * "validada_por IS NULL OR fecha_validacion IS NOT NULL", y los dos en null
+     * la cumplen. Es el mismo par que ya limpia {@link #rechazar(Long)}.
+     * <p>
+     * No se toca {@code creadaPor} ni {@code fechaRegistro}: quien creo la
+     * ficha no cambia porque alguien la edite.
+     */
+    private void invalidarRevisionPrevia(Especie entidad) {
+        EstadoPublicacion estado = entidad.getEstadoPublicacion();
+
+        if (estado == EstadoPublicacion.PUBLICADA) {
+            entidad.setEstadoPublicacion(EstadoPublicacion.EN_REVISION);
+            entidad.setPublicadaPor(null);
+            entidad.setFechaPublicacion(null);
+            entidad.setValidadaPor(null);
+            entidad.setFechaValidacion(null);
+            return;
+        }
+
+        // EN_REVISION sin validar no entra: no hay nada que limpiar, y entrar
+        // no cambiaria nada pero haria creer que si.
+        if (estado == EstadoPublicacion.EN_REVISION && entidad.getValidadaPor() != null) {
+            entidad.setValidadaPor(null);
+            entidad.setFechaValidacion(null);
+        }
+
+        // BORRADOR y RECHAZADA: sin revision previa, no se toca nada.
+    }
+
+    /**
+     * Exige que la taxonomia de la ficha diga la familia, para las dos
+     * transiciones que lo requieren: {@link #validar(Long)} y
+     * {@link #publicar(Long)}.
+     * <p>
+     * En blanco cuenta igual que ausente: la columna es {@code varchar(100)}
+     * sin {@code NOT NULL} y {@code normalizar(TaxonomiaRequest)} deja pasar
+     * la cadena vacia, asi que comprobar solo el null dejaria entrar un
+     * {@code ""} que no identifica ninguna familia.
+     * <p>
+     * Es {@link EstadoInvalidoException} --y por tanto 409-- y no un error de
+     * validacion de 400, porque la ficha no esta mal formada: el dato es
+     * opcional en BORRADOR y EN_REVISION por decision del equipo, y lo que
+     * falla es la precondicion de la transicion. El DTO sigue sin exigirlo.
+     *
+     * @param mensaje el que nombra la transicion que se rechaza, porque el
+     *                mismo dato ausente se lee distinto al validar que al
+     *                publicar.
+     */
+    private void exigirFamilia(Especie entidad, String mensaje) {
+        // getTaxonomia() dispara aqui la carga perezosa del @OneToOne(LAZY);
+        // las dos llamadas son @Transactional, asi que ocurre dentro de la
+        // transaccion.
+        String familia = entidad.getTaxonomia().getFamilia();
+
+        if (familia == null || familia.isBlank()) {
+            throw new EstadoInvalidoException(mensaje);
+        }
     }
 
     private Especie buscarOFallar(Long id) {

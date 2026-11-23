@@ -97,7 +97,10 @@ public class EspecieController {
                     + "activa, validadaPor, publicadaPor o fechas enviados en el cuerpo son "
                     + "ignorados silenciosamente; el flujo editorial se gestiona con los "
                     + "endpoints PATCH dedicados (enviar-revision, validar, publicar, "
-                    + "rechazar).")
+                    + "rechazar). Editar el contenido sí invalida la revisión previa: una "
+                    + "ficha PUBLICADA vuelve a EN_REVISION y pierde validación y "
+                    + "publicación, y una ya validada pierde la validación. Hay que "
+                    + "revalidar y volver a publicar.")
     @PreAuthorize("hasAuthority('ESPECIE_CREAR')")
     @PostMapping
     public ResponseEntity<EspecieResponse> crear(@Valid @RequestBody EspecieRequest request) {
@@ -119,7 +122,10 @@ public class EspecieController {
      * Se usa PATCH y no PUT porque es una actualizacion parcial del recurso
      * especie: modifica su clasificacion sin tocar la ficha.
      */
-    @Operation(summary = "Rectificar solo la clasificación taxonómica de una especie")
+    @Operation(summary = "Rectificar solo la clasificación taxonómica de una especie",
+            description = "Es una edición de contenido: invalida la revisión previa igual "
+                    + "que el PUT. Una ficha PUBLICADA vuelve a EN_REVISION y pierde "
+                    + "validación y publicación; una ya validada pierde la validación.")
     @PreAuthorize("hasAuthority('ESPECIE_EDITAR')")
     @PatchMapping("/{id}/taxonomia")
     public ResponseEntity<EspecieResponse> actualizarTaxonomia(
@@ -139,7 +145,11 @@ public class EspecieController {
     @Operation(summary = "Marcar la ficha como validada, sin publicarla",
             description = "El validador es el usuario del token. El parámetro idValidador "
                     + "se eliminó: permitía atribuirle la validación a otro usuario. Si se "
-                    + "envía, se ignora.")
+                    + "envía, se ignora. La familia de la taxonomía es obligatoria para "
+                    + "validar: si está vacía responde 409 y la ficha no se valida.")
+    @ApiResponse(responseCode = "409",
+            description = "La ficha no está EN_REVISION, ya tiene validador, o su taxonomía "
+                    + "no trae familia")
     @PreAuthorize("hasAuthority('ESPECIE_VALIDAR')")
     @PatchMapping("/{id}/validar")
     public ResponseEntity<EspecieResponse> validar(@PathVariable Long id) {
@@ -149,7 +159,12 @@ public class EspecieController {
     @Operation(summary = "Publicar una ficha ya validada",
             description = "El publicador es el usuario del token. El parámetro "
                     + "idPublicador se eliminó, por el mismo motivo que idValidador en "
-                    + "validar. Si se envía, se ignora.")
+                    + "validar. Si se envía, se ignora. La familia de la taxonomía se "
+                    + "vuelve a exigir aquí: es la compuerta que garantiza que nada "
+                    + "publicado quede sin familia, incluso si se vació después de validar.")
+    @ApiResponse(responseCode = "409",
+            description = "La ficha no está EN_REVISION, no tiene validador, o su taxonomía "
+                    + "no trae familia")
     @PreAuthorize("hasAuthority('ESPECIE_PUBLICAR')")
     @PatchMapping("/{id}/publicar")
     public ResponseEntity<EspecieResponse> publicar(@PathVariable Long id) {

@@ -55,12 +55,23 @@ public interface EspecieService {
     EspecieResponse crear(EspecieRequest request);
 
     /** Actualiza los campos editables de la ficha y su taxonomia. */
+    /**
+     * Reescribe el contenido propio de la ficha. La lista de nombres comunes se
+     * ignora aunque venga en el request: se gestiona por sus propios endpoints.
+     * <p>
+     * Editar invalida la revision previa: una ficha PUBLICADA vuelve a
+     * EN_REVISION y pierde validacion y publicacion, y una ya validada pierde
+     * la validacion. El detalle y el motivo, en {@code invalidarRevisionPrevia}.
+     */
     EspecieResponse actualizar(Long id, EspecieRequest request);
 
     /**
      * Rectifica solo la clasificacion taxonomica, sin tocar el resto de la
      * ficha. Evita tener que reenviar la especie completa para corregir un
      * genero o una familia.
+     * <p>
+     * Es una edicion de contenido, asi que invalida la revision previa igual
+     * que {@link #actualizar(Long, EspecieRequest)}.
      */
     EspecieResponse actualizarTaxonomia(Long idEspecie, TaxonomiaRequest request);
 
@@ -80,12 +91,23 @@ public interface EspecieService {
      * El validador es el usuario autenticado, igual que el creador en
      * {@link #crear(EspecieRequest)}: antes llegaba como parametro de query y
      * eso permitia firmar la validacion en nombre de otro.
+     * <p>
+     * Precondicion de datos: la taxonomia tiene que decir la familia. Es
+     * decision del equipo con Agronomia, y por eso no esta en el DTO: en
+     * BORRADOR y EN_REVISION la familia sigue siendo opcional, y lo que la
+     * exige es esta transicion. Sin familia sale 409 y la ficha no se valida.
      */
     EspecieResponse validar(Long id);
 
     /**
      * Publica una ficha ya validada. El publicador es el usuario autenticado,
      * por el mismo motivo que el validador en {@link #validar(Long)}.
+     * <p>
+     * Repite la compuerta de familia de {@link #validar(Long)}, y es la que de
+     * verdad garantiza que nada publicado quede sin familia: entre validar y
+     * publicar, un {@code ESPECIE_EDITAR} puede vaciarla por PUT o por
+     * PATCH /taxonomia, que no tienen guarda de estado. Sin familia sale 409 y
+     * la ficha se queda EN_REVISION.
      */
     EspecieResponse publicar(Long id);
 
