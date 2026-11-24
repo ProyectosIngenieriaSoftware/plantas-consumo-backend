@@ -1,0 +1,64 @@
+-- V21__baja_logica_aporte_nutricional.sql
+--
+-- Armoniza el borrado de aporte_nutricional con el resto del catalogo: la
+-- columna de estado que le faltaba para que DELETE pueda dar de baja en lugar
+-- de borrar la fila.
+--
+--
+-- POR QUE ES V21
+-- ==============
+-- V20 es la ultima version aplicada en florav1 (flyway_schema_history,
+-- version 20, 'rol de sistema', success = true) y tambien la ultima en disco,
+-- asi que V21 es el siguiente numero libre. Ninguna migracion aplicada se
+-- modifica: reusar un numero haria fallar el arranque por version repetida y
+-- editar un archivo ya aplicado le rompe el checksum. baseline-version sigue
+-- en 3. Mismo criterio que V12, V17, V18, V19 y V20.
+--
+--
+-- QUE CAMBIA Y POR QUE
+-- ====================
+-- aporte_nutricional era la unica pieza del catalogo cuyo DELETE borraba
+-- fisico: DELETE /api/aportes-nutricionales/{id} quitaba la fila y el GET
+-- posterior respondia 404. Sus hermanos no funcionan asi --habitat,
+-- parte_planta, nutriente, fuente y, desde el cambio anterior, beneficio dan
+-- de baja con el DELETE y se recuperan con PATCH /{id}/activar-- y la
+-- diferencia tenia dos costes:
+--
+--   * el dato se perdia. Un aporte nutricional es una medicion citada a una
+--     fuente; retirarlo de la ficha no deberia borrar que alguna vez se
+--     midio.
+--   * no habia marcha atras. Un borrado por error solo se arreglaba
+--     volviendo a teclear la medicion, la unidad y la porcion de referencia.
+--
+-- La diferencia con beneficio es que beneficio ya tenia su columna activo
+-- desde V2; aporte_nutricional no tenia ninguna columna de estado, y de ahi
+-- esta migracion.
+--
+--
+-- EL NOMBRE DE LA COLUMNA
+-- =======================
+-- activo, en masculino, por el genero de la entidad: "un aporte". Es la misma
+-- convencion que beneficio.activo, nutriente.activo, habitat.activo y
+-- parte_planta.activo. Las que llevan activa son las de entidad femenina
+-- --fuente.activa, epoca_cosecha.activa, parte_beneficio.activa,
+-- especie_parte_comestible.activa--, y no es el caso.
+--
+--
+-- POR QUE ES SEGURA
+-- =================
+-- Es aditiva y con valor por omision, asi que no necesita UPDATE de relleno:
+-- PostgreSQL le pone true a todas las filas existentes al crear la columna.
+-- Los aportes que ya estan en el catalogo quedan activos, que es su estado
+-- real --estaban visibles-- y deja el comportamiento publico igual que antes
+-- del cambio.
+--
+-- No se le crea indice. La tabla se consulta siempre por el padre
+-- (id_especie_parte, que ya tiene idx_aporte_parte) o por id_nutriente, y el
+-- filtro de activo es una condicion extra sobre un conjunto ya pequeno: el
+-- mismo criterio con el que beneficio.activo se quedo sin indice.
+
+ALTER TABLE aporte_nutricional
+    ADD COLUMN activo boolean DEFAULT true NOT NULL;
+
+COMMENT ON COLUMN aporte_nutricional.activo IS
+    'Baja logica: false = aporte retirado. Lo pone en false DELETE /api/aportes-nutricionales/{id} y lo devuelve a true PATCH /api/aportes-nutricionales/{id}/activar. Un aporte en false no se pinta en la ficha publica (GET /especie-parte/{id} filtra siempre por activo) ni sale en GET /nutriente/{id}?soloActivos=true.';

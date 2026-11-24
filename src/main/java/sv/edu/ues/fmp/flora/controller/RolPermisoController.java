@@ -1,0 +1,97 @@
+package sv.edu.ues.fmp.flora.controller;
+
+import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import sv.edu.ues.fmp.flora.dto.request.RolPermisoRequest;
+import sv.edu.ues.fmp.flora.dto.response.PermisoResponse;
+import sv.edu.ues.fmp.flora.dto.response.RolPermisoResponse;
+import sv.edu.ues.fmp.flora.service.RolPermisoService;
+
+@Tag(name = "Rol-Permiso", description = "Asignación de permisos a roles (tabla de unión "
+        + "rol_permiso)")
+@RestController
+@RequestMapping("/api/rol-permisos")
+@RequiredArgsConstructor
+/*
+ * Cierre de la escalacion vertical de privilegios.
+ *
+ * Hasta aqui estos endpoints solo exigian estar autenticado: cualquier
+ * usuario con un token valido, incluso uno de rol CONSULTOR, podia asignarse
+ * ADMINISTRADOR o conceder cualquier permiso a cualquier rol. Un login
+ * bastaba para volverse administrador.
+ *
+ * El permiso va a nivel de clase y no por metodo porque aqui no hay ninguna
+ * excepcion que atender: ninguno de estos endpoints es publico --la matriz de
+ * SecurityConfig ya los deja todos detras de authenticated()-- y ninguno
+ * necesita un permiso distinto, los GET incluidos: saber que roles tiene
+ * quien, o que permisos trae un rol, es el mapa de la autorizacion y no tiene
+ * por que leerlo cualquiera. Anotar la clase ademas evita que un endpoint
+ * nuevo quede abierto por olvido, que es exactamente como se abrio esto.
+ */
+@PreAuthorize("hasAuthority('USUARIO_GESTIONAR')")
+public class RolPermisoController {
+
+    private final RolPermisoService rolPermisoService;
+
+    @Operation(summary = "Listar los permisos de un rol",
+            description = "Devuelve los permisos asignados al rol indicado a través de "
+                    + "rol_permiso. Un rol sin permisos asignados devuelve una lista vacía, "
+                    + "no un error.")
+    @ApiResponse(responseCode = "200", description = "Listado obtenido")
+    @ApiResponse(responseCode = "400", description = "El id del rol no es un valor positivo")
+    @ApiResponse(responseCode = "404", description = "No existe un rol con ese id")
+    @GetMapping("/rol/{idRol}")
+    public ResponseEntity<List<PermisoResponse>> obtenerPermisosDeRol(@PathVariable Long idRol) {
+        return ResponseEntity.ok(rolPermisoService.obtenerPermisosDeRol(idRol));
+    }
+
+    @Operation(summary = "Asignar un permiso a un rol",
+            description = "Crea la fila en rol_permiso. La combinación idRol + idPermiso no "
+                    + "puede repetirse. Si el rol es de sistema (esSistema=true), solo el "
+                    + "superadministrador puede cambiar sus permisos (SEG-H09 R7).")
+    @ApiResponse(responseCode = "201", description = "Permiso asignado")
+    @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "403", description = "El rol es de sistema y quien llama no "
+            + "es el superadministrador")
+    @ApiResponse(responseCode = "404", description = "No existe el rol o el permiso indicado")
+    @ApiResponse(responseCode = "409", description = "El rol ya tiene asignado ese permiso, o el rol/permiso está desactivado")
+    @PostMapping
+    public ResponseEntity<RolPermisoResponse> asignar(@Valid @RequestBody RolPermisoRequest request) {
+        RolPermisoResponse creado = rolPermisoService.asignar(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(creado);
+    }
+
+    @Operation(summary = "Quitar un permiso de un rol",
+            description = "Borra físicamente la fila de rol_permiso (la relación en sí no "
+                    + "tiene baja lógica: o el rol tiene el permiso, o no lo tiene). Si el "
+                    + "rol es de sistema (esSistema=true), solo el superadministrador puede "
+                    + "cambiar sus permisos: vaciar el rol ADMINISTRADOR degradaría a todos "
+                    + "los administradores de una sola petición (SEG-H09 R7).")
+    @ApiResponse(responseCode = "204", description = "Permiso quitado del rol")
+    @ApiResponse(responseCode = "400", description = "Algún id no es un valor positivo")
+    @ApiResponse(responseCode = "403", description = "El rol es de sistema y quien llama no "
+            + "es el superadministrador")
+    @ApiResponse(responseCode = "404", description = "No existe el rol, o el rol no tenía "
+            + "asignado ese permiso")
+    @DeleteMapping("/rol/{idRol}/permiso/{idPermiso}")
+    public ResponseEntity<Void> quitar(@PathVariable Long idRol, @PathVariable Long idPermiso) {
+        rolPermisoService.quitar(idRol, idPermiso);
+        return ResponseEntity.noContent().build();
+    }
+}

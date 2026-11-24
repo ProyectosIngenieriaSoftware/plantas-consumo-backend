@@ -1,0 +1,273 @@
+package sv.edu.ues.fmp.flora.controller;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import sv.edu.ues.fmp.flora.dto.request.UsuarioCambioClaveRequest;
+import sv.edu.ues.fmp.flora.dto.request.UsuarioCambioCredencialesRequest;
+import sv.edu.ues.fmp.flora.dto.request.UsuarioCreationRequest;
+import sv.edu.ues.fmp.flora.dto.request.UsuarioLoginRequest;
+import sv.edu.ues.fmp.flora.dto.request.UsuarioUpdateRequest;
+import sv.edu.ues.fmp.flora.dto.response.PaginaResponse;
+import sv.edu.ues.fmp.flora.dto.response.UsuarioResponse;
+import sv.edu.ues.fmp.flora.service.UsuarioService;
+
+@Tag(name = "Usuarios", description = "Cuentas del personal interno del sistema "
+        + "(investigadores y administradores) y su autenticación")
+@RestController
+@RequestMapping("/api/usuarios")
+@RequiredArgsConstructor
+public class UsuarioController {
+
+    private static final Logger log = LoggerFactory.getLogger(UsuarioController.class);
+
+    private final UsuarioService usuarioService;
+
+    @Operation(summary = "Listar usuarios", description = "Devuelve el catálogo paginado. Con "
+                    + "soloActivos=true omite las cuentas dadas de baja lógica. pagina inicia "
+                    + "en 0; tamanio acepta de 1 a 100 elementos por página.")
+    @ApiResponse(responseCode = "200", description = "Listado obtenido")
+    @ApiResponse(responseCode = "400", description = "Parametro invalido")
+    @PreAuthorize("hasAuthority('USUARIO_GESTIONAR')")
+    @GetMapping
+    public ResponseEntity<PaginaResponse<UsuarioResponse>> listar(
+            @Parameter(description = "Si es true, excluye las cuentas desactivadas")
+            @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos,
+            @Parameter(description = "Número de página, inicia en 0")
+            @RequestParam(name = "pagina", defaultValue = "0") int pagina,
+            @Parameter(description = "Cantidad de elementos por página (máximo 100)")
+            @RequestParam(name = "tamanio", defaultValue = "10") int tamanio) {
+
+        PaginaResponse<UsuarioResponse> respuesta = soloActivos
+                ? usuarioService.listarActivos(pagina, tamanio)
+                : usuarioService.listarTodos(pagina, tamanio);
+
+        return ResponseEntity.ok(respuesta);
+    }
+
+    @Operation(summary = "Obtener un usuario por su id")
+    @ApiResponse(responseCode = "200", description = "Usuario encontrado")
+    @ApiResponse(responseCode = "400", description = "Id invalido")
+    @ApiResponse(responseCode = "400", description = "Parametro invalido")
+    @ApiResponse(responseCode = "404", description = "No existe un usuario con ese id")
+    @PreAuthorize("hasAuthority('USUARIO_GESTIONAR')")
+    @GetMapping("/{id}")
+    public ResponseEntity<UsuarioResponse> obtenerPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(usuarioService.obtenerPorId(id));
+    }
+
+    @Operation(summary = "Crear un usuario",
+            description = "correo y nombreUsuario son únicos en todo el catálogo, sin "
+                    + "distinguir mayúsculas. La clave nunca se persiste en texto plano: "
+                    + "se guarda como clave_hash.")
+    @ApiResponse(responseCode = "201", description = "Usuario creado")
+    @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "409", description = "Ya existe un usuario con ese correo o nombre de usuario")
+    @PreAuthorize("hasAuthority('USUARIO_GESTIONAR')")
+    @PostMapping
+    public ResponseEntity<UsuarioResponse> crear(@Valid @RequestBody UsuarioCreationRequest request) {
+        UsuarioResponse creado = usuarioService.crear(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(creado);
+    }
+
+    @Operation(summary = "Actualizar los datos de un usuario",
+            description = "Cambia el nombre y el apellido, y nada más. El correo y el nombre "
+                    + "de usuario son autoservicio del dueño (PUT /credenciales): un "
+                    + "administrador no los reescribe en una cuenta ajena. Tampoco cambia la "
+                    + "clave ni la bandera de estado: para eso están el PUT /clave, el DELETE "
+                    + "y el PATCH /activar. A los datos del superadministrador solo los cambia "
+                    + "él mismo.")
+    @ApiResponse(responseCode = "200", description = "Usuario actualizado")
+    @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "403",
+            description = "El objetivo es el superadministrador y quien llama no es él")
+    @ApiResponse(responseCode = "404", description = "No existe un usuario con ese id")
+    @PreAuthorize("hasAuthority('USUARIO_GESTIONAR')")
+    @PutMapping("/{id}")
+    public ResponseEntity<UsuarioResponse> actualizar(
+            @PathVariable Long id,
+            @Valid @RequestBody UsuarioUpdateRequest request) {
+
+        return ResponseEntity.ok(usuarioService.actualizar(id, request));
+    }
+
+    @Operation(summary = "Dar de baja lógica un usuario",
+            description = "No borra la fila: especie la referencia por creada_por, "
+                    + "validada_por y publicada_por, y un DELETE físico rompería esas "
+                    + "referencias. Una cuenta inactiva no puede iniciar sesión.")
+    @ApiResponse(responseCode = "204", description = "Usuario desactivado")
+    @ApiResponse(responseCode = "404", description = "No existe un usuario con ese id")
+    @PreAuthorize("hasAuthority('USUARIO_GESTIONAR')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> desactivar(@PathVariable Long id) {
+        usuarioService.desactivar(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Reactivar un usuario dado de baja",
+            description = "Vuelve a poner activo=true. Los roles que tenía en usuario_rol "
+                    + "nunca se borraron al desactivarlo, así que puede volver a iniciar "
+                    + "sesión con las mismas credenciales de siempre.")
+    @ApiResponse(responseCode = "200", description = "Usuario reactivado")
+    @ApiResponse(responseCode = "404", description = "No existe un usuario con ese id")
+    @PreAuthorize("hasAuthority('USUARIO_GESTIONAR')")
+    @PatchMapping("/{id}/activar")
+    public ResponseEntity<UsuarioResponse> reactivar(@PathVariable Long id) {
+        return ResponseEntity.ok(usuarioService.reactivar(id));
+    }
+
+    @Operation(summary = "Cambiar la contraseña de un usuario",
+            description = "Autoservicio: un usuario solo puede cambiar su propia clave. El id "
+                    + "de la ruta tiene que ser el del usuario del token; si no, 403. Además "
+                    + "sigue exigiendo la clave actual. El restablecimiento por olvido es "
+                    + "otro flujo (POST /api/usuarios/recuperar-clave).")
+    @ApiResponse(responseCode = "204", description = "Clave actualizada")
+    @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "401", description = "La clave actual no es correcta, o falta el token")
+    @ApiResponse(responseCode = "403", description = "El id no es el del usuario autenticado")
+    @ApiResponse(responseCode = "404", description = "No existe un usuario con ese id")
+    /*
+     * Guard de propiedad contra escalacion horizontal.
+     *
+     * Hasta aqui el endpoint solo exigia la clave actual, nunca comprobaba de
+     * quien era el {id}: cualquier usuario autenticado que conociera la clave
+     * actual de otro podia cambiarsela. Validar la clave no alcanza, porque
+     * responde "esta clave es correcta" sobre una cuenta ajena.
+     *
+     * El chequeo va en @PreAuthorize y no dentro del servicio a proposito:
+     * method-security corre ANTES de entrar al metodo, asi que un intento
+     * sobre el id de otro se corta antes de tocar la base y antes de comparar
+     * ninguna clave. Un atacante no llega a distinguir "clave actual correcta
+     * sobre cuenta ajena" de "clave actual incorrecta sobre cuenta ajena":
+     * las dos dan 403.
+     *
+     * authentication.name es el sub del token (el id del usuario), y es
+     * String; #id es Long, y comparar Long con String en SpEL siempre da
+     * falso, de ahi el toString().
+     *
+     * Deliberadamente NO lleva un "or hasRole('ADMIN')": este endpoint pide la
+     * clave actual, que un administrador no tiene. El reseteo por
+     * administrador, si el equipo lo quiere, es otro endpoint con sus propias
+     * reglas.
+     */
+    @PreAuthorize("#id.toString() == authentication.name")
+    @PutMapping("/{id}/clave")
+    public ResponseEntity<Void> cambiarClave(
+            @PathVariable Long id,
+            @Valid @RequestBody UsuarioCambioClaveRequest request) {
+
+        usuarioService.cambiarClave(id, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Cambiar el correo y el nombre de usuario propios",
+            description = "Autoservicio, como el PUT /clave: el id de la ruta tiene que ser el "
+                    + "del usuario del token (si no, 403) y además hay que enviar la clave "
+                    + "actual. Es la única vía que escribe el correo y el nombre de usuario "
+                    + "después de la creación; un administrador no puede cambiárselos a otra "
+                    + "cuenta por el PUT de edición.")
+    @ApiResponse(responseCode = "200", description = "Credenciales actualizadas")
+    @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "401", description = "La clave actual no es correcta, o falta el token")
+    @ApiResponse(responseCode = "403", description = "El id no es el del usuario autenticado")
+    @ApiResponse(responseCode = "404", description = "No existe un usuario con ese id")
+    @ApiResponse(responseCode = "409",
+            description = "Ya existe otro usuario con ese correo o nombre de usuario")
+    /*
+     * El correo y el nombre de usuario salieron del PUT de edicion y llegaron
+     * aqui, con el mismo guard de propiedad que la clave.
+     *
+     * El motivo es una suplantacion, no una preferencia de diseño:
+     * POST /api/usuarios/recuperar-clave es publico y resuelve la cuenta por su
+     * correo, asi que mientras un administrador pudo reescribir el correo de
+     * otra cuenta, pudo tambien apuntarlo a su propio buzon, pedir el
+     * restablecimiento y quedarse con ella. Con la cuenta del
+     * superadministrador eso saltaba por encima de SEG-H09 entero: R4 impedia
+     * desactivarlo, pero nadie impedia suplantarlo.
+     *
+     * Y por eso el arreglo no es solo proteger al superadmin: ninguna cuenta
+     * tiene por que poder ser repuntada por un tercero, asi que el cambio es
+     * autoservicio para todas.
+     *
+     * Misma mecanica que cambiarClave: la comparacion con authentication.name
+     * --el sub del token, que es el id-- va en @PreAuthorize para que un
+     * intento sobre el id de otro se corte antes de tocar la base y antes de
+     * comparar ninguna clave. Y se sigue pidiendo la clave actual: el token
+     * prueba que hay una sesion, la clave prueba que esta la persona, que es lo
+     * que corresponde para la operacion que decide a donde llega el enlace de
+     * recuperacion.
+     */
+    @PreAuthorize("#id.toString() == authentication.name")
+    @PutMapping("/{id}/credenciales")
+    public ResponseEntity<UsuarioResponse> cambiarCredenciales(
+            @PathVariable Long id,
+            @Valid @RequestBody UsuarioCambioCredencialesRequest request) {
+
+        return ResponseEntity.ok(usuarioService.cambiarCredenciales(id, request));
+    }
+
+    /**
+     * Login sin token, el que existia antes de JWT.
+     * <p>
+     * <strong>Reemplazado por {@code POST /api/auth/login}; retirar cuando el
+     * frontend migre.</strong> La fecha de retiro se coordina con el equipo de
+     * frontend: este metodo no la decide.
+     * <p>
+     * Valida las credenciales igual que el nuevo --los dos pasan por
+     * {@code UsuarioService.iniciarSesion}, asi que comparten el BCrypt, la
+     * actualizacion de {@code ultimo_acceso} y el freno a la fuerza bruta--
+     * pero devuelve solo el usuario, sin token, asi que quien se autentique por
+     * aqui no puede llamar a ningun endpoint protegido. Sigue publico para no
+     * romper al frontend mientras migra.
+     * <p>
+     * Cada uso deja un WARN en el log: es la unica forma de saber si alguien
+     * lo sigue llamando y, cuando los WARN desaparezcan, de poder retirarlo con
+     * tranquilidad.
+     */
+    @Deprecated(since = "JWT", forRemoval = true)
+    @Operation(summary = "Iniciar sesión (obsoleto)",
+            deprecated = true,
+            description = "OBSOLETO: use POST /api/auth/login, que devuelve un token. Este "
+                    + "endpoint valida las credenciales igual pero no emite token, así que no "
+                    + "sirve para llamar a endpoints protegidos. Se mantiene solo mientras el "
+                    + "frontend migra y se retirará cuando termine. "
+                    + "El campo usuario acepta indistintamente el correo o el nombre de "
+                    + "usuario. Si la cuenta existe, está activa y la clave coincide, "
+                    + "actualiza ultimo_acceso y devuelve el usuario. El mensaje de error es "
+                    + "siempre el mismo para no revelar cuál de las tres cosas falló.")
+    @ApiResponse(responseCode = "200", description = "Autenticación exitosa")
+    @ApiResponse(responseCode = "400", description = "El cuerpo de la petición no es válido")
+    @ApiResponse(responseCode = "401",
+            description = "Usuario o clave incorrectos, o la cuenta está desactivada")
+    @ApiResponse(responseCode = "429",
+            description = "Demasiados intentos fallidos; la cuenta está en enfriamiento")
+    @PostMapping("/login")
+    public ResponseEntity<UsuarioResponse> iniciarSesion(@Valid @RequestBody UsuarioLoginRequest request) {
+        // Sin el usuario ni la clave: lo que interesa es si todavia hay quien
+        // llame a este endpoint, no quien. El identificador acabaria en el log
+        // de la aplicacion sin necesidad.
+        log.warn("Se llamo al login obsoleto POST /api/usuarios/login; "
+                + "el frontend deberia usar POST /api/auth/login");
+
+        return ResponseEntity.ok(usuarioService.iniciarSesion(request));
+    }
+}
