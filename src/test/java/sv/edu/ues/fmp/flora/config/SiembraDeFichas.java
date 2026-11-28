@@ -33,6 +33,7 @@ import sv.edu.ues.fmp.flora.entity.VideoEspecie;
 import sv.edu.ues.fmp.flora.entity.VideoPreparacion;
 import sv.edu.ues.fmp.flora.entity.enums.CategoriaNutriente;
 import sv.edu.ues.fmp.flora.entity.enums.EstadoPublicacion;
+import sv.edu.ues.fmp.flora.entity.enums.OrigenImagen;
 import sv.edu.ues.fmp.flora.entity.enums.ParteBeneficioId;
 import sv.edu.ues.fmp.flora.entity.enums.TipoBeneficio;
 import sv.edu.ues.fmp.flora.entity.enums.TipoConsumo;
@@ -193,9 +194,14 @@ public final class SiembraDeFichas {
                 .activa(true)
                 .build());
 
+        // La imagen sembrada es un enlace externo, como las 18 del catalogo
+        // real. El origen es explicito porque la entidad no le pone default a
+        // proposito --ver OrigenImagen-- y la columna es NOT NULL desde V22:
+        // sin esto, cada siembra falla con una violacion de restriccion.
         ImagenEspecie imagenEspecie = persistir(ImagenEspecie.builder()
                 .especie(especie)
                 .tipoImagen(TipoImagen.PLANTA_COMPLETA)
+                .origen(OrigenImagen.URL)
                 .urlImagen("https://example.invalid/siembra-" + n + ".jpg")
                 .textoAlternativo("Imagen sembrada por las pruebas")
                 // Sin principal: el esquema tiene un unico parcial para la

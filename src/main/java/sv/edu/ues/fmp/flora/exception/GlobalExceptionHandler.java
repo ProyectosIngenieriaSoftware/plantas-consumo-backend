@@ -24,6 +24,8 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -728,6 +730,82 @@ public class GlobalExceptionHandler {
                 .mensaje("La solicitud contiene parámetros inválidos")
                 .ruta(request.getRequestURI())
                 .erroresValidacion(erroresValidacion)
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(cuerpo);
+    }
+
+    /**
+     * El archivo subido excede el limite configurado -> 413 CONTENT TOO LARGE.
+     *
+     * <h2>Por que hace falta el manejador</h2>
+     * Sin el, la excepcion caia en {@link #manejarExcepcionNoAnticipada} y
+     * salia como 500 "Error interno": culpar al servidor de que el cliente
+     * mando un archivo de 30MB es exactamente el defecto que ese catch-all
+     * documenta como propio. Mismo caso que
+     * {@link HttpRequestMethodNotSupportedException} y
+     * {@link HttpMediaTypeNotSupportedException} en su momento.
+     *
+     * <h2>Por que 413 y no 400</h2>
+     * 413 es el codigo que existe para esto y el que un cliente puede tratar
+     * sin leer el mensaje --reintentar con una imagen mas pequena, no corregir
+     * el formulario--. Un 400 generico obligaria a distinguir "el archivo pesa
+     * demasiado" de "el archivo no es una imagen" parseando el texto.
+     *
+     * <h2>El limite que se nombra</h2>
+     * Se lee de la excepcion ({@code getMaxUploadSize()}, los bytes que
+     * configura {@code spring.servlet.multipart.max-file-size}) y se expresa en
+     * MB, que es como esta escrito en {@code application.properties} y como lo
+     * piensa quien sube la imagen. Si la excepcion no lo trae --puede llegar
+     * en -1 segun donde se detecte-- el mensaje no inventa una cifra.
+     *
+     * <h2>Nada quedo escrito</h2>
+     * El limite lo aplica el parser de multipart antes de que la peticion
+     * llegue al controlador, asi que el servicio no corrio, no se genero ningun
+     * UUID y no se abrio ningun archivo en la carpeta de almacenamiento.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> manejarArchivoDemasiadoGrande(
+            MaxUploadSizeExceededException ex,
+            HttpServletRequest request) {
+
+        long maximoBytes = ex.getMaxUploadSize();
+        String limite = maximoBytes > 0
+                ? " El máximo permitido es " + (maximoBytes / (1024 * 1024)) + " MB."
+                : "";
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.PAYLOAD_TOO_LARGE.value())
+                .error("Archivo demasiado grande")
+                .mensaje("El archivo enviado excede el tamaño máximo permitido." + limite)
+                .ruta(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(cuerpo);
+    }
+
+    /**
+     * Falta una parte obligatoria del {@code multipart/form-data} -> 400 BAD
+     * REQUEST.
+     * <p>
+     * Hermano del anterior: un POST de subida sin la parte del archivo es un
+     * error del cliente, y sin manejador propio tambien acabaria en el
+     * catch-all como 500. El mensaje nombra la parte que falta para que se
+     * pueda corregir la llamada.
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> manejarParteFaltante(
+            MissingServletRequestPartException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse cuerpo = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .estado(HttpStatus.BAD_REQUEST.value())
+                .error("Parte faltante")
+                .mensaje("Falta la parte '" + ex.getRequestPartName()
+                        + "' en la solicitud multipart/form-data")
+                .ruta(request.getRequestURI())
                 .build();
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(cuerpo);
