@@ -205,8 +205,14 @@ public class EspecieController {
         return ResponseEntity.ok(especieService.rechazar(id));
     }
 
-    @Operation(summary = "Dar de baja lógica una especie")
+    @Operation(summary = "Dar de baja lógica una especie",
+            description = "Baja lógica (activa = false); nunca un DELETE físico. Una especie "
+                    + "PUBLICADA no se puede dar de baja: para retirarla del catálogo hay que "
+                    + "sacarla antes del estado PUBLICADA por la vía editorial. Las especies en "
+                    + "BORRADOR, EN_REVISION o RECHAZADA se dan de baja sin restricción.")
     @ApiResponse(responseCode = "204", description = "Especie desactivada")
+    @ApiResponse(responseCode = "404", description = "No existe una especie con ese id")
+    @ApiResponse(responseCode = "409", description = "La especie está publicada")
     @PreAuthorize("hasAuthority('ESPECIE_EDITAR')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> desactivar(@PathVariable Long id) {

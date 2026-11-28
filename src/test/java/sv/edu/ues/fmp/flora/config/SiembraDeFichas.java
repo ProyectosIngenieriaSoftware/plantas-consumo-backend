@@ -143,8 +143,17 @@ public final class SiembraDeFichas {
 
         Usuario responsable = responsable();
 
+        // Los siete rangos llenos y subespecie en null, que es la forma de las
+        // quince fichas reales del catalogo. Es lo que exige la compuerta de
+        // taxonomia completa (revision #6) para validar y para publicar, y
+        // varias pruebas siembran precisamente para recorrer esas dos
+        // transiciones: sembrar la clasificacion a medias las haria fallar por
+        // el estado de la siembra y no por lo que cada una mira.
         Taxonomia taxonomia = persistir(Taxonomia.builder()
                 .reino("Plantae")
+                .division("Pruebophyta")
+                .clase("Pruebopsida")
+                .ordenTaxonomico("Pruebales")
                 .familia("Pruebaceae")
                 .genero("Zzsiembra" + n)
                 .especieTaxonomica("visibilidad")

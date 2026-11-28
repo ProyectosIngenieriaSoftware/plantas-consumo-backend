@@ -127,7 +127,14 @@ public interface EspecieService {
 
     EspecieResponse rechazar(Long id);
 
-    /** Baja logica. Nunca DELETE fisico: varias tablas referencian la especie. */
+    /**
+     * Baja logica. Nunca DELETE fisico: varias tablas referencian la especie.
+     * <p>
+     * Una especie PUBLICADA no se puede dar de baja: lanza
+     * {@code EstadoInvalidoException} (409). Para retirarla del catalogo hay
+     * que sacarla antes del estado PUBLICADA por la via editorial. BORRADOR,
+     * EN_REVISION y RECHAZADA se dan de baja sin restriccion.
+     */
     void desactivar(Long id);
 
     /**

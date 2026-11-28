@@ -450,12 +450,16 @@ class EdicionInvalidaLaRevisionTest {
                 .andExpect(jsonPath("$.mensaje")
                         .value("La especie debe ser validada antes de publicarse"));
 
-        // 3. Y si alguien intenta revalidar, la compuerta de familia sigue ahi.
+        // 3. Y si alguien intenta revalidar, la compuerta sigue ahi. El cuerpo
+        // del PATCH conservo los demas rangos, asi que la familia es lo unico
+        // que falta y el mensaje la nombra sola: la compuerta de familia no se
+        // diluyo al generalizarse a los siete rangos (revision #6).
         mockMvc.perform(patch("/api/especies/" + ficha.id() + "/validar")
                         .header(HttpHeaders.AUTHORIZATION, token(ESPECIE_VALIDAR)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.mensaje")
-                        .value("No se puede validar: la familia de la taxonomía es obligatoria"));
+                        .value("No se puede validar: la clasificación taxonómica debe estar"
+                                + " completa; faltan: familia"));
 
         Especie sinTocar = recargar(ficha.id());
         assertEquals(EstadoPublicacion.EN_REVISION, sinTocar.getEstadoPublicacion());
@@ -518,6 +522,15 @@ class EdicionInvalidaLaRevisionTest {
      * Cuerpo del PUT: se conservan el nombre cientifico y la taxonomia de la
      * ficha --son unicos en el esquema y cambiarlos daria un 409 de duplicado
      * que no es lo que se mide-- y solo se mueve la descripcion.
+     * <p>
+     * "Se conserva la taxonomia" significa los siete rangos, no solo los tres
+     * que el DTO exige. {@code TaxonomiaMapper.updateEntity} escribe cada rango
+     * tal cual, null incluido, de modo que un cuerpo que omita
+     * {@code division}, {@code clase} u {@code ordenTaxonomico} los borra, y
+     * desde la compuerta de taxonomia completa (revision #6) la ficha ya no se
+     * podria revalidar: {@link #cicloCompleto_publicadaEditarRevalidarRepublicar()}
+     * fallaria en el paso 2 por el estado del cuerpo de la prueba y no por la
+     * regla que mide.
      */
     private static String cuerpoPut(Ficha ficha, String descripcion) {
         return """
@@ -525,29 +538,50 @@ class EdicionInvalidaLaRevisionTest {
                   "nombreCientifico": "%s",
                   "descripcion": "%s",
                   "taxonomia": {
+                    "division": "%s",
+                    "clase": "%s",
+                    "ordenTaxonomico": "%s",
+                    "familia": "%s",
                     "genero": "%s",
-                    "especieTaxonomica": "%s",
-                    "familia": "%s"
+                    "especieTaxonomica": "%s"
                   }
                 }
                 """.formatted(
                 ficha.especie().getNombreCientifico(),
                 descripcion,
+                ficha.especie().getTaxonomia().getDivision(),
+                ficha.especie().getTaxonomia().getClase(),
+                ficha.especie().getTaxonomia().getOrdenTaxonomico(),
+                ficha.especie().getTaxonomia().getFamilia(),
                 ficha.especie().getTaxonomia().getGenero(),
-                ficha.especie().getTaxonomia().getEspecieTaxonomica(),
-                ficha.especie().getTaxonomia().getFamilia());
+                ficha.especie().getTaxonomia().getEspecieTaxonomica());
     }
 
-    /** Cuerpo del PATCH /taxonomia; {@code familia} null lo omite del JSON. */
+    /**
+     * Cuerpo del PATCH /taxonomia; {@code familia} null lo omite del JSON.
+     * <p>
+     * Los otros rangos se repiten tal como los tiene la ficha, por lo mismo que
+     * en {@link #cuerpoPut}: el PATCH escribe lo que recibe y omitirlos los
+     * borraria. Asi la familia es lo <em>unico</em> que este cuerpo cambia, que
+     * es lo que necesita
+     * {@link #regresionDelHuecoDeFamilia_editarQuitaLaValidacionYLaCompuertaSigueCubriendo()}
+     * para que el 409 de la revalidacion nombre la familia y nada mas.
+     */
     private static String cuerpoTaxonomia(Ficha ficha, String familia) {
         String campoFamilia = familia == null ? "" : ",\n  \"familia\": \"" + familia + "\"";
 
         return """
                 {
+                  "division": "%s",
+                  "clase": "%s",
+                  "ordenTaxonomico": "%s",
                   "genero": "%s",
                   "especieTaxonomica": "%s"%s
                 }
                 """.formatted(
+                ficha.especie().getTaxonomia().getDivision(),
+                ficha.especie().getTaxonomia().getClase(),
+                ficha.especie().getTaxonomia().getOrdenTaxonomico(),
                 ficha.especie().getTaxonomia().getGenero(),
                 ficha.especie().getTaxonomia().getEspecieTaxonomica(),
                 campoFamilia);

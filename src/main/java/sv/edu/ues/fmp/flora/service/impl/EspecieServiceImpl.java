@@ -302,13 +302,13 @@ public class EspecieServiceImpl implements EspecieService {
                             + ". Para asignar un nuevo validador, rechácela primero.");
         }
 
-        // Compuerta de familia: decision del equipo con Agronomia. El revisor
-        // no aprueba una ficha cuya taxonomia no diga a que familia pertenece.
+        // Compuerta de taxonomia completa: revision del Dr. Dagoberto (#6). El
+        // revisor no aprueba una ficha cuya clasificacion este a medias. Nacio
+        // exigiendo solo la familia y ahora cubre los siete rangos.
         // Va despues de las dos guardas de arriba a proposito: el estado y la
         // doble validacion son diagnosticos mas informativos para quien llama,
         // y esta es una precondicion de datos, no de transicion.
-        exigirFamilia(entidad,
-                "No se puede validar: la familia de la taxonomía es obligatoria");
+        exigirTaxonomiaCompleta(entidad, "validar");
 
         // El validador es quien trae el token. Antes llegaba en la query, de
         // modo que quien tenia ESPECIE_VALIDAR podia atribuirle la validacion
@@ -347,14 +347,14 @@ public class EspecieServiceImpl implements EspecieService {
                     "La especie debe ser validada antes de publicarse");
         }
 
-        // La compuerta que de verdad garantiza que lo publicado tenga familia.
-        // Repetirla aqui no es redundante: validar() ya la exige, pero ni
-        // actualizar() ni actualizarTaxonomia() tienen guarda de estado y
-        // TaxonomiaMapper.updateEntity escribe familia tal cual, null incluido,
-        // asi que entre validar y publicar un ESPECIE_EDITAR puede dejarla en
-        // blanco. Sin esta comprobacion esa ficha se publicaria sin familia.
-        exigirFamilia(entidad,
-                "No se puede publicar: la familia de la taxonomía es obligatoria");
+        // La compuerta que de verdad garantiza que lo publicado lleve la
+        // clasificacion completa. Repetirla aqui no es redundante: validar() ya
+        // la exige, pero ni actualizar() ni actualizarTaxonomia() tienen guarda
+        // de estado y TaxonomiaMapper.updateEntity escribe cada rango tal cual,
+        // null incluido, asi que entre validar y publicar un ESPECIE_EDITAR
+        // puede vaciar cualquiera. Sin esta comprobacion esa ficha se
+        // publicaria con la taxonomia a medias.
+        exigirTaxonomiaCompleta(entidad, "publicar");
 
         // Mismo criterio que el validador: sale del token.
         Usuario publicador = buscarUsuarioOFallar(usuarioAutenticado.id(), "publicador");
@@ -429,10 +429,39 @@ public class EspecieServiceImpl implements EspecieService {
         return responderActualizada(entidad, request);
     }
 
+    /**
+     * Baja logica de la ficha, con una excepcion: una especie PUBLICADA no se
+     * da de baja.
+     *
+     * <h2>La guarda de estado</h2>
+     * Revision #9 del Dr. Dagoberto. Lo publicado es el catalogo, y la baja lo
+     * saca de ahi sin dejar rastro en el flujo editorial: la ficha desaparece
+     * de {@code listarPublicadas()} --que filtra por {@code activa}-- mientras
+     * su {@code estado_publicacion} sigue diciendo PUBLICADA, o sea que la
+     * unica senal de que algo paso es una bandera que el publico no ve. Para
+     * retirar una ficha del catalogo existe la via editorial, que si deja
+     * rastro: editarla la devuelve a EN_REVISION ({@code invalidarRevisionPrevia}),
+     * y desde ahi se la puede rechazar y dar de baja.
+     * <p>
+     * Va antes de cualquier escritura, asi que el 409 no deja nada a medias.
+     * La autorizacion es anterior a todo esto: sin {@code ESPECIE_EDITAR} sale
+     * 403 en el {@code @PreAuthorize} del controlador y nunca se llega aqui.
+     *
+     * <h2>Los otros tres estados</h2>
+     * BORRADOR, EN_REVISION y RECHAZADA se siguen dando de baja igual: ninguna
+     * esta en el catalogo publico, asi que no hay nada que retirar ni rastro
+     * que perder.
+     *
+     * @throws EstadoInvalidoException 409 si la especie esta PUBLICADA
+     */
     @Override
     @Transactional
     public void desactivar(Long id) {
         Especie entidad = buscarOFallar(id);
+
+        if (entidad.getEstadoPublicacion() == EstadoPublicacion.PUBLICADA) {
+            throw new EstadoInvalidoException("No se puede dar de baja una especie publicada");
+        }
 
         // Baja logica: varias tablas apuntan a especie por llave foranea, un
         // DELETE fisico romperia esas referencias.
@@ -741,32 +770,96 @@ public class EspecieServiceImpl implements EspecieService {
     }
 
     /**
-     * Exige que la taxonomia de la ficha diga la familia, para las dos
-     * transiciones que lo requieren: {@link #validar(Long)} y
+     * Exige que la clasificacion taxonomica de la ficha este completa, para las
+     * dos transiciones que lo requieren: {@link #validar(Long)} y
      * {@link #publicar(Long)}.
      * <p>
-     * En blanco cuenta igual que ausente: la columna es {@code varchar(100)}
-     * sin {@code NOT NULL} y {@code normalizar(TaxonomiaRequest)} deja pasar
-     * la cadena vacia, asi que comprobar solo el null dejaria entrar un
-     * {@code ""} que no identifica ninguna familia.
-     * <p>
-     * Es {@link EstadoInvalidoException} --y por tanto 409-- y no un error de
-     * validacion de 400, porque la ficha no esta mal formada: el dato es
-     * opcional en BORRADOR y EN_REVISION por decision del equipo, y lo que
-     * falla es la precondicion de la transicion. El DTO sigue sin exigirlo.
+     * Generaliza la compuerta que antes exigia solo la familia
+     * ({@code exigirFamilia}). Es la revision #6 del Dr. Dagoberto: para
+     * validar o publicar no basta la familia, la clasificacion entera tiene que
+     * estar escrita. La familia no pierde cobertura, es uno de los siete
+     * rangos.
      *
-     * @param mensaje el que nombra la transicion que se rechaza, porque el
-     *                mismo dato ausente se lee distinto al validar que al
-     *                publicar.
+     * <h2>Los siete rangos, y por que subespecie no es uno de ellos</h2>
+     * Se exigen {@code reino}, {@code division}, {@code clase},
+     * {@code ordenTaxonomico}, {@code familia}, {@code genero} y
+     * {@code especieTaxonomica}. {@code subespecie} queda deliberadamente
+     * fuera: no es un rango que toda especie tenga --la mayoria no esta
+     * dividida en subespecies-- asi que exigirlo no seria "la clasificacion
+     * completa" sino un dato inventado. Las quince fichas del catalogo
+     * (cargadas por {@code V14}) lo tienen todas en null y tienen los otros
+     * siete llenos, que es exactamente la forma que esta compuerta describe.
+     * Ademas {@code uk_taxonomia} lo indexa con {@code NULLS NOT DISTINCT}
+     * contando con que sea null.
+     *
+     * <h2>Cuales pueden faltar de verdad</h2>
+     * Solo cuatro: {@code division}, {@code clase}, {@code ordenTaxonomico} y
+     * {@code familia} son las columnas sin {@code NOT NULL}, y son las unicas
+     * que el DTO no exige. Los otros tres se comprueban igual, no por
+     * desconfianza del esquema sino porque la regla es "la clasificacion
+     * completa" y una compuerta que se salte tres rangos deja de decir eso: si
+     * manana se relaja una columna, o un dato entra por SQL, la compuerta no
+     * tiene que cambiar. {@code reino} en particular es inalcanzable --
+     * {@code ck_taxonomia_reino} exige {@code lower(reino) = 'plantae'}, que
+     * ni el null ni el blanco cumplen-- y se deja por la misma razon.
+     *
+     * <h2>El blanco y el null</h2>
+     * En blanco cuenta igual que ausente, como ya hacia la compuerta de
+     * familia: las columnas son {@code varchar} y
+     * {@code normalizar(TaxonomiaRequest)} convierte la cadena vacia en null
+     * antes del mapper, de modo que un {@code ""} o un {@code "   "} solo puede
+     * venir de SQL o de una carga anterior a la regla. Comprobar solo el null
+     * lo dejaria pasar, y un espacio no nombra ningun taxon.
+     *
+     * <h2>Por que 409 y no 400</h2>
+     * Es {@link EstadoInvalidoException} --y por tanto 409-- y no un error de
+     * validacion de 400, porque la ficha no esta mal formada: los rangos son
+     * opcionales en BORRADOR y EN_REVISION por decision del equipo, y lo que
+     * falla es la precondicion de la transicion. El DTO sigue sin exigirlos.
+     *
+     * @param accion el verbo de la transicion que se rechaza
+     *               ({@code "validar"} o {@code "publicar"}), porque el mismo
+     *               dato ausente se lee distinto en cada una
+     * @throws EstadoInvalidoException con el mensaje que nombra los rangos que
+     *                                 faltan, para que quien llama sepa que
+     *                                 enviar sin tener que adivinar rango por
+     *                                 rango
      */
-    private void exigirFamilia(Especie entidad, String mensaje) {
+    private void exigirTaxonomiaCompleta(Especie entidad, String accion) {
         // getTaxonomia() dispara aqui la carga perezosa del @OneToOne(LAZY);
         // las dos llamadas son @Transactional, asi que ocurre dentro de la
         // transaccion.
-        String familia = entidad.getTaxonomia().getFamilia();
+        Taxonomia clasificacion = entidad.getTaxonomia();
 
-        if (familia == null || familia.isBlank()) {
-            throw new EstadoInvalidoException(mensaje);
+        // En el orden de la jerarquia, de reino a especie, que es como se lee
+        // una clasificacion y como se listan en el mensaje.
+        List<String> faltantes = new ArrayList<>();
+        agregarSiFalta(faltantes, "reino", clasificacion.getReino());
+        agregarSiFalta(faltantes, "division", clasificacion.getDivision());
+        agregarSiFalta(faltantes, "clase", clasificacion.getClase());
+        agregarSiFalta(faltantes, "ordenTaxonomico", clasificacion.getOrdenTaxonomico());
+        agregarSiFalta(faltantes, "familia", clasificacion.getFamilia());
+        agregarSiFalta(faltantes, "genero", clasificacion.getGenero());
+        agregarSiFalta(faltantes, "especieTaxonomica", clasificacion.getEspecieTaxonomica());
+
+        if (!faltantes.isEmpty()) {
+            throw new EstadoInvalidoException(
+                    "No se puede " + accion + ": la clasificación taxonómica debe estar"
+                            + " completa; faltan: " + String.join(", ", faltantes));
+        }
+    }
+
+    /**
+     * Apunta un rango en la lista de los que faltan si no trae nada util.
+     * <p>
+     * El nombre que se apunta es el del campo del DTO --{@code ordenTaxonomico}
+     * y no {@code orden_taxonomico}-- porque el mensaje lo va a leer quien
+     * manda el JSON, y lo que necesita es el nombre de la propiedad que le
+     * falta enviar, no el de la columna.
+     */
+    private static void agregarSiFalta(List<String> faltantes, String rango, String valor) {
+        if (valor == null || valor.isBlank()) {
+            faltantes.add(rango);
         }
     }
 
